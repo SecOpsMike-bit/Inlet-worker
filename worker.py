@@ -1,14 +1,12 @@
 """
 worker.py  -  field-aware refresh worker for Inlet.
 
-Pulls every company in the directory, classifies each role into a field, scores
-it, and writes the results to the database. Run as a scheduled job.
+Reads the company directory from the database (the `companies` table, populated
+by discovery.py), classifies every role into a field, scores it, and writes the
+results to the `roles` table. Runs on a schedule.
 
-Run once (live, writes to whatever DATABASE_URL points at):
-    python worker.py
-Demo (no network, sample roles across fields, local SQLite):
-    python worker.py --demo
-Loop:
+    python worker.py            # live
+    python worker.py --demo     # sample roles, no network
     python worker.py --loop --interval 10800
 """
 
@@ -21,28 +19,54 @@ import engine as eng
 from directory import DIRECTORY
 
 
+def _company_dict(c):
+    """Turn a Company row into the dict engine.pull_company expects."""
+    base = {"name": c.name, "tier": c.tier or 3}
+    if c.platform == "workday" and c.wd_tenant:
+        base["workday"] = {"tenant": c.wd_tenant, "pod": c.wd_pod, "site": c.wd_site}
+    else:
+        base["slug"] = c.slug
+    return base
+
+
+def load_companies():
+    """Read active companies from the DB; seed from directory.py the first time."""
+    s = db.Session()
+    try:
+        rows = s.query(db.Company).filter(db.Company.active == True).all()
+        if not rows:
+            for c in DIRECTORY:
+                if "workday" in c:
+                    w = c["workday"]
+                    s.add(db.Company(name=c["name"], tier=c["tier"], platform="workday",
+                                     wd_tenant=w["tenant"], wd_pod=w["pod"], wd_site=w["site"],
+                                     active=True, source="seed"))
+                else:
+                    s.add(db.Company(name=c["name"], tier=c["tier"], platform="auto",
+                                     slug=c["slug"], active=True, source="seed"))
+            s.commit()
+            rows = s.query(db.Company).filter(db.Company.active == True).all()
+        return [_company_dict(c) for c in rows]
+    finally:
+        s.close()
+
+
 def _demo_jobs():
     def ago(d):
         return (dt.date.today() - dt.timedelta(days=d)).strftime("%Y-%m-%d")
     return [
         ({"name": "Cyderes", "tier": 1},
          eng._job("Junior SOC Analyst", "Remote, Canada", "https://example.com/1", ago(2),
-                  "Monitor SIEM alerts, triage and incident response, threat hunting. Splunk, EDR, MITRE ATT&CK. Entry level role on our security operations team.")),
+                  "Monitor SIEM alerts, triage and incident response, threat hunting. Splunk, EDR, MITRE ATT&CK. Entry level.")),
         ({"name": "Shopify", "tier": 3},
          eng._job("Backend Software Engineer", "Remote, Canada", "https://example.com/2", ago(4),
-                  "Build and scale backend payment systems. Ruby, Go, distributed systems, APIs, on-call. Mid level.")),
+                  "Build and scale backend payment systems. Ruby, Go, distributed systems, APIs. Mid level.")),
         ({"name": "Kinaxis", "tier": 3},
          eng._job("Technical Project Manager", "Ottawa, Ontario", "https://example.com/3", ago(3),
-                  "Lead cross-functional delivery of supply chain software. Stakeholder management, Agile, roadmaps and timelines.")),
-        ({"name": "RBC", "tier": 2},
-         eng._job("Senior Security Engineer", "Toronto, Ontario", "https://example.com/4", ago(6),
-                  "Lead detection engineering, mentor analysts, design controls. 7+ years security experience required.")),
+                  "Lead cross-functional delivery of supply chain software. Stakeholder management, Agile, roadmaps.")),
         ({"name": "RBC", "tier": 2},
          eng._job("Data Analyst, Risk", "Toronto, Ontario", "https://example.com/5", ago(5),
-                  "SQL, Power BI, build dashboards and reporting for risk teams. Associate level, entry friendly.")),
-        ({"name": "Descartes", "tier": 3},
-         eng._job("Operations Analyst", "Waterloo, Ontario", "https://example.com/6", ago(7),
-                  "Support logistics operations, process improvement, supply chain reporting and vendor coordination.")),
+                  "SQL, Power BI, build dashboards and reporting for risk teams. Associate level.")),
     ]
 
 
@@ -58,7 +82,8 @@ def refresh(demo=False):
                 rows.append(r)
         ok = ["(demo)"]
     else:
-        for c in DIRECTORY:
+        companies = load_companies()
+        for c in companies:
             jobs = eng.pull_company(c)
             if jobs:
                 ok.append(c["name"])
@@ -87,14 +112,12 @@ def refresh(demo=False):
           f"from {len(ok)} companies ({len(failed)} no feed) in {secs}s")
     if by_field:
         print("  by field: " + ", ".join(f"{k} {v}" for k, v in sorted(by_field.items())))
-    if failed:
-        print("  no feed: " + ", ".join(failed))
     return len(rows)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Refresh Inlet roles")
-    ap.add_argument("--demo", action="store_true", help="sample roles, no network")
+    ap.add_argument("--demo", action="store_true")
     ap.add_argument("--loop", action="store_true")
     ap.add_argument("--interval", type=int, default=10800)
     args = ap.parse_args()
