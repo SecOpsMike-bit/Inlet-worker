@@ -17,6 +17,7 @@ import argparse
 import datetime as dt
 import json
 import re
+import time
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -32,10 +33,30 @@ GH_PATTERNS = ["boards.greenhouse.io/*", "job-boards.greenhouse.io/*"]
 SKIP_SLUGS = {"embed", "jobs", "v1", "boards", "internal", "assets", "static"}
 
 
-def _get(url, timeout=30):
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8", errors="replace")
+def _get(url, timeout=30, retries=4):
+    """GET with retry-and-backoff for transient errors (Common Crawl 502/503/timeouts)."""
+    last = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in (502, 503, 504, 429) and attempt < retries - 1:
+                wait = 5 * (attempt + 1)
+                print(f"  common crawl returned {e.code}, retrying in {wait}s...")
+                time.sleep(wait)
+                continue
+            raise
+        except Exception as e:
+            last = e
+            if attempt < retries - 1:
+                time.sleep(5 * (attempt + 1))
+                continue
+            raise
+    if last:
+        raise last
 
 
 def latest_cc_index():
@@ -121,10 +142,13 @@ def add_greenhouse_companies(slugs, min_canada=1):
     s = db.Session()
     try:
         for slug, canada in good:
-            s.add(db.Company(name=slug, tier=3, platform="greenhouse", slug=slug,
-                             active=True, source="greenhouse-cc", roles_found=canada,
-                             last_checked=dt.datetime.utcnow()))
-        s.commit()
+            try:
+                s.add(db.Company(name=slug, tier=3, platform="greenhouse", slug=slug,
+                                 active=True, source="greenhouse-cc", roles_found=canada,
+                                 last_checked=dt.datetime.utcnow()))
+                s.commit()
+            except Exception:
+                s.rollback()
     finally:
         s.close()
     return checked, len(good)
@@ -220,38 +244,36 @@ def add_workday_companies(sites, min_canada=1):
     s = db.Session()
     try:
         for t, p, si, canada in good:
-            s.add(db.Company(name=t, tier=3, platform="workday", wd_tenant=t, wd_pod=p,
-                             wd_site=si, active=True, source="workday-cc", roles_found=canada,
-                             last_checked=dt.datetime.utcnow()))
-        s.commit()
+            try:
+                s.add(db.Company(name=t, tier=3, platform="workday", wd_tenant=t, wd_pod=p,
+                                 wd_site=si, active=True, source="workday-cc", roles_found=canada,
+                                 last_checked=dt.datetime.utcnow()))
+                s.commit()
+            except Exception:
+                s.rollback()
     finally:
         s.close()
     return checked, len(good)
 
 
 def seed_from_directory():
-    """One-time load of the built-in starter companies into the table."""
+    """One-time load of the built-in starter companies into the table.
+    Safe to re-run: if the table already has companies, it does nothing."""
     s = db.Session()
     try:
-        have = _existing_keys(s)
+        if s.query(db.Company).count() > 0:
+            return 0
         added = 0
         for c in DIRECTORY:
             if "workday" in c:
                 w = c["workday"]
-                key = ("wd", w["tenant"], w["pod"], w["site"])
-                if key in have:
-                    continue
                 s.add(db.Company(name=c["name"], tier=c["tier"], platform="workday",
                                  wd_tenant=w["tenant"], wd_pod=w["pod"], wd_site=w["site"],
                                  active=True, source="seed"))
-                added += 1
             else:
-                key = ("slug", "greenhouse", c["slug"])   # platform auto-detected at fetch
-                if ("slug", "greenhouse", c["slug"]) in have or ("slug", "lever", c["slug"]) in have:
-                    continue
                 s.add(db.Company(name=c["name"], tier=c["tier"], platform="auto",
                                  slug=c["slug"], active=True, source="seed"))
-                added += 1
+            added += 1
         s.commit()
         return added
     finally:
