@@ -130,6 +130,105 @@ def add_greenhouse_companies(slugs, min_canada=1):
     return checked, len(good)
 
 
+# ============================================================ WORKDAY
+
+WD_RE = re.compile(r"https?://([a-z0-9][a-z0-9-]*)\.(wd\d+)\.myworkdayjobs\.com/([^?\s\"'<>]*)", re.I)
+LOCALE_RE = re.compile(r"^[a-z]{2}-[A-Za-z]{2}$")
+WD_SKIP = {"wday", "job", "jobs", "en", "assets", "search", "search-results", ""}
+
+
+def parse_workday(url):
+    """Extract (tenant, pod, site) from a Workday career URL, or None."""
+    m = WD_RE.search(url)
+    if not m:
+        return None
+    tenant, pod = m.group(1).lower(), m.group(2).lower()
+    segs = [s for s in m.group(3).split("/") if s]
+    if not segs or segs[0].lower() == "wday":
+        return None
+    idx = 1 if LOCALE_RE.match(segs[0]) else 0     # skip a locale segment like en-US / fr-CA
+    if len(segs) <= idx:
+        return None
+    site = segs[idx]
+    if site.lower() in WD_SKIP or len(site) < 2:
+        return None
+    return (tenant, pod, site)
+
+
+def harvest_workday_sites(max_sites=200):
+    """Pull unique Workday (tenant, pod, site) career sites from Common Crawl."""
+    cdx = latest_cc_index()
+    q = urllib.parse.urlencode({"url": "myworkdayjobs.com", "matchType": "domain",
+                                "output": "json", "fl": "url", "limit": max_sites * 40})
+    sites = set()
+    try:
+        body = _get(f"{cdx}?{q}", timeout=90)
+    except Exception as e:
+        print(f"  cdx workday query failed: {e}")
+        return []
+    for line in body.splitlines():
+        try:
+            u = json.loads(line).get("url", "")
+        except json.JSONDecodeError:
+            continue
+        parsed = parse_workday(u)
+        if parsed:
+            sites.add(parsed)
+        if len(sites) >= max_sites:
+            break
+    return sorted(sites)
+
+
+def validate_workday(tenant, pod, site):
+    """Lightweight check: does this Workday site return jobs, any in Canada?"""
+    cxs = f"https://{tenant}.{pod}.myworkdayjobs.com/wday/cxs/{tenant}/{site}"
+    try:
+        d = eng._post_json(f"{cxs}/jobs", {"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": ""})
+    except Exception:
+        return (False, 0, 0)
+    posts = d.get("jobPostings", [])
+    if not posts:
+        return (False, 0, 0)
+    canada = sum(1 for p in posts if eng.location_ok(p.get("locationsText", "")))
+    if canada == 0:                                  # second look, filtered to Canada
+        try:
+            d2 = eng._post_json(f"{cxs}/jobs", {"appliedFacets": {}, "limit": 5, "offset": 0, "searchText": "Canada"})
+            canada = sum(1 for p in d2.get("jobPostings", []) if eng.location_ok(p.get("locationsText", "")))
+        except Exception:
+            pass
+    return (True, len(posts), canada)
+
+
+def add_workday_companies(sites, min_canada=1):
+    """Validate Workday sites in parallel and upsert the Canadian-hiring ones."""
+    s = db.Session()
+    try:
+        have = _existing_keys(s)
+    finally:
+        s.close()
+
+    good, checked = [], 0
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {pool.submit(validate_workday, t, p, si): (t, p, si) for (t, p, si) in sites}
+        for fut in as_completed(futures):
+            t, p, si = futures[fut]
+            checked += 1
+            ok, total, canada = fut.result()
+            if ok and canada >= min_canada and ("wd", t, p, si) not in have:
+                good.append((t, p, si, canada))
+
+    s = db.Session()
+    try:
+        for t, p, si, canada in good:
+            s.add(db.Company(name=t, tier=3, platform="workday", wd_tenant=t, wd_pod=p,
+                             wd_site=si, active=True, source="workday-cc", roles_found=canada,
+                             last_checked=dt.datetime.utcnow()))
+        s.commit()
+    finally:
+        s.close()
+    return checked, len(good)
+
+
 def seed_from_directory():
     """One-time load of the built-in starter companies into the table."""
     s = db.Session()
@@ -159,29 +258,41 @@ def seed_from_directory():
         s.close()
 
 
-def run(max_slugs=500, seed_only=False):
+def run(max_slugs=500, seed_only=False, platform="both"):
     db.init_db()
     seeded = seed_from_directory()
     if seeded:
         print(f"seeded {seeded} starter companies")
     if seed_only:
         return
-    print(f"harvesting up to {max_slugs} Greenhouse slugs from Common Crawl...")
-    slugs = harvest_greenhouse_slugs(max_slugs)
-    print(f"  found {len(slugs)} candidate slugs, validating...")
-    checked, added = add_greenhouse_companies(slugs)
-    print(f"validated {checked}, added {added} new companies hiring in Canada/remote")
+
+    if platform in ("both", "greenhouse"):
+        print(f"[greenhouse] harvesting up to {max_slugs} slugs from Common Crawl...")
+        slugs = harvest_greenhouse_slugs(max_slugs)
+        print(f"  found {len(slugs)} candidate slugs, validating...")
+        checked, added = add_greenhouse_companies(slugs)
+        print(f"  validated {checked}, added {added} new Greenhouse companies")
+
+    if platform in ("both", "workday"):
+        print(f"[workday] harvesting up to {max_slugs} sites from Common Crawl...")
+        sites = harvest_workday_sites(max_slugs)
+        print(f"  found {len(sites)} candidate sites, validating...")
+        checked, added = add_workday_companies(sites)
+        print(f"  validated {checked}, added {added} new Workday companies")
+
     s = db.Session()
     try:
         total = s.query(db.Company).filter(db.Company.active == True).count()
+        wd = s.query(db.Company).filter(db.Company.platform == "workday", db.Company.active == True).count()
     finally:
         s.close()
-    print(f"directory now holds {total} active companies")
+    print(f"directory now holds {total} active companies ({wd} on Workday)")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Discover companies for Inlet")
-    ap.add_argument("--max", type=int, default=500, help="max slugs to harvest")
+    ap.add_argument("--max", type=int, default=500, help="max slugs/sites to harvest")
+    ap.add_argument("--platform", choices=["both", "greenhouse", "workday"], default="both")
     ap.add_argument("--seed", action="store_true", help="only load the starter list")
     args = ap.parse_args()
-    run(max_slugs=args.max, seed_only=args.seed)
+    run(max_slugs=args.max, seed_only=args.seed, platform=args.platform)
