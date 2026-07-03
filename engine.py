@@ -19,9 +19,16 @@ import urllib.error
 
 FIELD_PROFILES = {
     "cybersecurity": {"label": "Cybersecurity", "title": [
-        "security analyst", "soc analyst", "cybersecurity", "information security",
-        "security engineer", "threat", "grc", "incident response", "vulnerability",
-        "security operations", "cyber", "detection engineer", "appsec"]},
+        "security analyst", "soc analyst", "soc engineer", "cybersecurity",
+        "cyber security", "cyber", "cyber analyst", "information security", "infosec",
+        "security engineer", "security operations", "security operations center",
+        "threat", "grc", "governance risk", "incident response", "incident responder",
+        "vulnerability", "detection engineer", "detection analyst", "appsec",
+        "application security", "it risk", "cyber risk", "security risk",
+        "technology risk", "it security", "security compliance", "penetration test",
+        "pen test", "red team", "blue team", "identity and access", "iam ",
+        "security specialist", "security consultant", "security administrator",
+        "security architect", "malware analyst", "forensic", "siem"]},
     "software_engineering": {"label": "Software Engineering", "title": [
         "software engineer", "software developer", "backend", "back end", "frontend",
         "front end", "full stack", "full-stack", "developer", "devops", "sre",
@@ -57,7 +64,7 @@ FIELD_PRIORITY = ["cybersecurity", "data_analytics", "product_management",
                   "marketing", "sales", "operations"]
 
 SENIOR_TOKENS = ["senior", "sr ", "sr.", "lead ", "principal", "staff ", "director",
-                 "head of", " vp", "vice president", "chief", " iii", " ii"]
+                 "head of", " vp", "vice president", "chief", " iii", " iv"]
 ENTRY_TOKENS = ["junior", "jr ", "jr.", "entry", "associate", "graduate", "new grad",
                 "intern", " i ", "level i", "trainee", "apprentice"]
 
@@ -219,13 +226,50 @@ def classify_field(title):
     label = best_kw.title() if best_kw else FIELD_PROFILES[best]["label"]
     return best, label, best_hits
 
-def classify_level(title):
+def _min_years(text):
+    """Smallest years-of-experience figure mentioned in the description, if any."""
+    yrs = [int(x) for x in re.findall(r"(\d+)\s*\+?\s*years?", (text or "").lower())]
+    yrs = [y for y in yrs if y <= 20]
+    return min(yrs) if yrs else None
+
+def classify_level(title, text=""):
+    """Title signals first, then years-of-experience from the description."""
     t = " " + title.lower() + " "
     if any(tok in t for tok in SENIOR_TOKENS):
         return "senior"
     if any(tok in t for tok in ENTRY_TOKENS):
         return "entry"
+    y = _min_years(text)
+    if y is not None:
+        if y <= 2:
+            return "entry"
+        if y <= 5:
+            return "mid"
+        return "senior"
     return "mid"
+
+def score_recency(posted):
+    """Freshness score, 0-100. Fresh postings rank higher (early-application edge)."""
+    age = _age_days(posted)
+    if age is None:
+        return 55
+    if age <= 2:
+        return 100
+    if age <= 7:
+        return 85
+    if age <= 14:
+        return 70
+    if age <= 30:
+        return 50
+    if age <= 60:
+        return 30
+    return 15
+
+# security sub-lanes that are more open to career-changers with certs
+ACCESSIBLE_CYBER = ["grc", "it risk", "cyber risk", "security risk", "governance",
+                    "security compliance", "soc analyst", "information security analyst",
+                    "security analyst", "it security analyst", "compliance analyst"]
+ENTRY_CERTS = ["security+", "sec+", "cysa", "network+", "comptia", "csap", "gsec"]
 
 def _age_days(posted):
     if not posted:
@@ -270,13 +314,26 @@ def process(job, company):
     field, role_label, hits = classify_field(job["title"])
     if field is None:
         return None
-    level = classify_level(job["title"])
+    level = classify_level(job["title"], job["text"])
     realness = score_realness(job["title"], job["text"], job["posted"])
     if realness < 45:
         return None
+    recency = score_recency(job["posted"])
     field_fit = min(100, 55 + 15 * hits)
-    opportunity = min(100, round(0.6 * realness + 0.4 * field_fit) + TIER_BOOST.get(company["tier"], 0))
-    landability = min(100, LEVEL_LANDABILITY[level] + (5 if realness >= 80 else 0))
+    # best-match ranking now blends fit, quality, and freshness (early-application edge)
+    opportunity = min(100, round(0.4 * field_fit + 0.3 * realness + 0.3 * recency)
+                      + TIER_BOOST.get(company["tier"], 0))
+    # landability = how likely THIS profile lands it: level, plus accessible cert-friendly lanes
+    blob = (job["title"] + " " + job["text"]).lower()
+    t = job["title"].lower()
+    landability = LEVEL_LANDABILITY[level]
+    if level != "senior" and any(k in t for k in ACCESSIBLE_CYBER):
+        landability += 8
+    if any(c in blob for c in ENTRY_CERTS):
+        landability += 5
+    if realness >= 80:
+        landability += 3
+    landability = min(100, landability)
     flags = [f for f in FLAG_TERMS if f in (job["title"] + " " + job["text"]).lower()]
     posted_date = None
     s = str(job["posted"]).split("T")[0].split(" ")[0]
