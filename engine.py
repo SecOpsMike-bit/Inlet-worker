@@ -69,10 +69,22 @@ ENTRY_TOKENS = ["junior", "jr ", "jr.", "entry", "associate", "graduate", "new g
                 "intern", " i ", "level i", "trainee", "apprentice"]
 
 CANADA_TERMS = ["canada", "canadian", "ontario", "toronto", "ottawa", "mississauga",
-                "vancouver", "montreal", "calgary", "alberta", "quebec", "remote",
-                "british columbia", "waterloo", "hamilton", "edmonton", "winnipeg"]
-REMOTE_EXCLUDED = ["usa only", "us only", "united states only", "u.s. only",
-                   "europe only", "uk only", "india only"]
+                "vancouver", "montreal", "calgary", "alberta", "quebec", "montréal",
+                "british columbia", "waterloo", "hamilton", "edmonton", "winnipeg",
+                "kitchener", "london, on", "halifax", "victoria", "saskatchewan",
+                "manitoba", "nova scotia", "brampton", "markham", "burnaby", " on,",
+                " ab,", " bc,", " qc,", " ns,"]
+# a location naming any of these is not a Canadian role, even if it says "remote"
+FOREIGN_TERMS = ["united states", "usa", "u.s.", "u.s ", "(us)", "us only", "us-based",
+                 "us based", "remote us", "remote, us", "remote - us", "america",
+                 "india", "united kingdom", " uk", "uk ", "england", "scotland",
+                 "ireland", "australia", "new zealand", "germany", "france", "spain",
+                 "italy", "netherlands", "poland", "romania", "portugal", "singapore",
+                 "philippines", "malaysia", "japan", "china", "hong kong", "brazil",
+                 "mexico", "argentina", "colombia", "south africa", "nigeria", "kenya",
+                 "egypt", "uae", "dubai", "israel", "europe", "emea", "apac", "latam",
+                 "asia pacific", "latin america"]
+REMOTE_TERMS = ["remote", "work from home", "wfh", "anywhere"]
 VAGUE_TERMS = ["competitive salary", "fast-paced environment", "talent community",
                "talent pool", "always hiring", "evergreen", "pipeline"]
 FLAG_TERMS = ["security clearance", "secret clearance", "canadian citizen",
@@ -300,12 +312,18 @@ def score_realness(title, text, posted):
     return max(0, score)
 
 def location_ok(location):
-    loc = location.lower()
-    if any(t in loc for t in REMOTE_EXCLUDED):
-        return False
+    """Keep Canadian roles and genuinely unspecified-remote roles; reject foreign ones.
+    A role that names another country is rejected even when it also says 'remote'."""
+    loc = (location or "").lower().strip()
     if not loc:
-        return True
-    return any(t in loc for t in CANADA_TERMS)
+        return True                                  # unknown location -> keep (conservative)
+    if any(t in loc for t in CANADA_TERMS):
+        return True                                  # names a Canadian place -> keep
+    if any(t in loc for t in FOREIGN_TERMS):
+        return False                                 # names another country -> reject
+    if any(t in loc for t in REMOTE_TERMS):
+        return True                                  # remote with no foreign country -> keep
+    return False                                     # a named non-Canadian place -> reject
 
 def process(job, company):
     """Turn one raw job into a scored, field-tagged row, or None to skip."""
