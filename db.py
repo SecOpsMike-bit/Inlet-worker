@@ -24,6 +24,7 @@ class Role(Base):
     __tablename__ = "roles"
     id = Column(Integer, primary_key=True)
     company = Column(String(200))
+    company_id = Column(Integer)
     tier = Column(Integer)
     field = Column(String(60))
     role_label = Column(String(120))
