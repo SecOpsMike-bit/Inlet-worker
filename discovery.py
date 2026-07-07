@@ -256,6 +256,79 @@ def add_workday_companies(sites, min_canada=1):
     return checked, len(good)
 
 
+# ============================================================ SMARTRECRUITERS
+
+SR_PATTERNS = ["careers.smartrecruiters.com/*", "jobs.smartrecruiters.com/*"]
+SR_SKIP = {"api", "app", "www", "assets", "static", "jobs", "careers"}
+
+
+def harvest_smartrecruiters_slugs(max_slugs=300):
+    """Pull SmartRecruiters company identifiers from Common Crawl (case-sensitive)."""
+    cdx = latest_cc_index()
+    slugs = set()
+    for pattern in SR_PATTERNS:
+        q = urllib.parse.urlencode({"url": pattern, "output": "json", "fl": "url", "limit": max_slugs * 4})
+        try:
+            body = _get(f"{cdx}?{q}", timeout=60)
+        except Exception as e:
+            print(f"  cdx smartrecruiters query failed for {pattern}: {e}")
+            continue
+        for line in body.splitlines():
+            try:
+                u = json.loads(line).get("url", "")
+            except json.JSONDecodeError:
+                continue
+            m = re.search(r"smartrecruiters\.com/([A-Za-z0-9_.-]+)", u)
+            if m:
+                slug = m.group(1)
+                if slug.lower() not in SR_SKIP and len(slug) > 1:
+                    slugs.add(slug)                       # keep original case (API is case-sensitive)
+            if len(slugs) >= max_slugs:
+                break
+        if len(slugs) >= max_slugs:
+            break
+    return sorted(slugs)
+
+
+def validate_smartrecruiters(slug):
+    try:
+        d = eng._get_json(f"https://api.smartrecruiters.com/v1/companies/{slug}/postings?limit=20")
+    except Exception:
+        return (False, 0, 0)
+    content = d.get("content", [])
+    if not content:
+        return (False, 0, 0)
+    canada = sum(1 for p in content if eng.location_ok(eng.sr_location(p.get("location"))))
+    return (True, len(content), canada)
+
+
+def add_smartrecruiters_companies(slugs, min_canada=1):
+    s = db.Session()
+    try:
+        have = _existing_keys(s)
+    finally:
+        s.close()
+    good, checked = [], 0
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(validate_smartrecruiters, slug): slug for slug in slugs}
+        for fut in as_completed(futures):
+            slug = futures[fut]
+            checked += 1
+            ok, total, canada = fut.result()
+            if ok and canada >= min_canada and ("slug", "smartrecruiters", slug) not in have:
+                good.append((slug, canada))
+    s = db.Session()
+    try:
+        for slug, canada in good:
+            s.add(db.Company(name=slug, tier=3, platform="smartrecruiters", slug=slug,
+                             active=True, source="smartrecruiters-cc", roles_found=canada,
+                             last_checked=dt.datetime.utcnow()))
+        s.commit()
+    finally:
+        s.close()
+    return checked, len(good)
+
+
 def seed_from_directory():
     """One-time load of the built-in starter companies into the table.
     Safe to re-run: if the table already has companies, it does nothing."""
@@ -280,7 +353,7 @@ def seed_from_directory():
         s.close()
 
 
-def run(max_slugs=500, seed_only=False, platform="both"):
+def run(max_slugs=500, seed_only=False, platform="all"):
     db.init_db()
     seeded = seed_from_directory()
     if seeded:
@@ -288,33 +361,41 @@ def run(max_slugs=500, seed_only=False, platform="both"):
     if seed_only:
         return
 
-    if platform in ("both", "greenhouse"):
+    if platform in ("all", "both", "greenhouse"):
         print(f"[greenhouse] harvesting up to {max_slugs} slugs from Common Crawl...")
         slugs = harvest_greenhouse_slugs(max_slugs)
         print(f"  found {len(slugs)} candidate slugs, validating...")
         checked, added = add_greenhouse_companies(slugs)
         print(f"  validated {checked}, added {added} new Greenhouse companies")
 
-    if platform in ("both", "workday"):
+    if platform in ("all", "both", "workday"):
         print(f"[workday] harvesting up to {max_slugs} sites from Common Crawl...")
         sites = harvest_workday_sites(max_slugs)
         print(f"  found {len(sites)} candidate sites, validating...")
         checked, added = add_workday_companies(sites)
         print(f"  validated {checked}, added {added} new Workday companies")
 
+    if platform in ("all", "smartrecruiters"):
+        print(f"[smartrecruiters] harvesting up to {max_slugs} companies from Common Crawl...")
+        srs = harvest_smartrecruiters_slugs(max_slugs)
+        print(f"  found {len(srs)} candidate companies, validating...")
+        checked, added = add_smartrecruiters_companies(srs)
+        print(f"  validated {checked}, added {added} new SmartRecruiters companies")
+
     s = db.Session()
     try:
         total = s.query(db.Company).filter(db.Company.active == True).count()
         wd = s.query(db.Company).filter(db.Company.platform == "workday", db.Company.active == True).count()
+        sr = s.query(db.Company).filter(db.Company.platform == "smartrecruiters", db.Company.active == True).count()
     finally:
         s.close()
-    print(f"directory now holds {total} active companies ({wd} on Workday)")
+    print(f"directory now holds {total} active companies ({wd} Workday, {sr} SmartRecruiters)")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Discover companies for Inlet")
     ap.add_argument("--max", type=int, default=500, help="max slugs/sites to harvest")
-    ap.add_argument("--platform", choices=["both", "greenhouse", "workday"], default="both")
+    ap.add_argument("--platform", choices=["all", "greenhouse", "workday", "smartrecruiters"], default="all")
     ap.add_argument("--seed", action="store_true", help="only load the starter list")
     args = ap.parse_args()
     run(max_slugs=args.max, seed_only=args.seed, platform=args.platform)

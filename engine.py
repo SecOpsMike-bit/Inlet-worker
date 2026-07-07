@@ -140,7 +140,56 @@ def fetch_ashby(slug):
                  j.get("publishedAt", ""), _strip(j.get("descriptionHtml") or j.get("descriptionPlain")))
             for j in d.get("jobs", [])]
 
-_AUTO = [("greenhouse", fetch_greenhouse), ("lever", fetch_lever), ("ashby", fetch_ashby)]
+COUNTRY_MAP = {"ca": "Canada", "us": "United States", "usa": "United States",
+               "gb": "United Kingdom", "uk": "United Kingdom", "in": "India",
+               "au": "Australia", "de": "Germany", "fr": "France", "ie": "Ireland",
+               "sg": "Singapore", "ph": "Philippines", "nl": "Netherlands",
+               "br": "Brazil", "mx": "Mexico", "es": "Spain", "it": "Italy"}
+
+
+def sr_location(loc):
+    """Build a readable location string from a SmartRecruiters location object."""
+    loc = loc or {}
+    country = COUNTRY_MAP.get((loc.get("country") or "").lower(), loc.get("country") or "")
+    parts = [loc.get("city"), loc.get("region"), country]
+    s = ", ".join([x for x in parts if x])
+    if loc.get("remote"):
+        s = (s + ", Remote") if s else "Remote"
+    return s
+
+
+def fetch_smartrecruiters(slug, cap=200):
+    base = f"https://api.smartrecruiters.com/v1/companies/{slug}/postings"
+    out, offset = [], 0
+    while offset < cap:
+        d = _get_json(f"{base}?limit=100&offset={offset}")
+        content = d.get("content", [])
+        if not content:
+            break
+        for p in content:
+            pid = p.get("id")
+            url = f"https://jobs.smartrecruiters.com/{slug}/{pid}"
+            text = _sr_detail(slug, pid) or p.get("name", "")
+            out.append(_job(p.get("name"), sr_location(p.get("location")), url,
+                            p.get("releasedDate", ""), text))
+        offset += 100
+        if offset >= d.get("totalFound", 0):
+            break
+    return out
+
+
+def _sr_detail(slug, pid):
+    try:
+        d = _get_json(f"https://api.smartrecruiters.com/v1/companies/{slug}/postings/{pid}")
+        secs = ((d.get("jobAd") or {}).get("sections")) or {}
+        keys = ["companyDescription", "jobDescription", "qualifications", "additionalInformation"]
+        return " ".join(_strip((secs.get(k) or {}).get("text", "")) for k in keys).strip()
+    except Exception:
+        return ""
+
+
+_AUTO = [("greenhouse", fetch_greenhouse), ("lever", fetch_lever),
+         ("ashby", fetch_ashby), ("smartrecruiters", fetch_smartrecruiters)]
 
 def discover(slug):
     for platform, fetch in _AUTO:
@@ -213,24 +262,52 @@ def _workday_date(s):
         return (today - dt.timedelta(days=30 * int(m.group(1)))).strftime("%Y-%m-%d")
     return ""
 
+_FETCHERS = {"greenhouse": fetch_greenhouse, "lever": fetch_lever,
+             "ashby": fetch_ashby, "smartrecruiters": fetch_smartrecruiters}
+
+
 def pull_company(company):
     try:
         if "workday" in company:
             w = company["workday"]
             return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"]) if j]
-        _, jobs = discover(company["slug"])
+        platform = company.get("platform")
+        if platform in _FETCHERS:                     # known platform -> fetch directly
+            return [j for j in _FETCHERS[platform](company["slug"]) if j]
+        _, jobs = discover(company["slug"])           # unknown -> auto-detect
         return jobs
     except Exception:
         return []
 
 # ============================================================ CLASSIFY + SCORE
 
+import functools
+
+# financial/business risk roles that are not cybersecurity, even if they contain "risk"
+NON_CYBER_RISK = ["credit risk", "market risk", "financial risk", "operational risk",
+                  "enterprise risk", "liquidity risk", "investment risk", "insurance risk",
+                  "actuarial", "underwriting"]
+
+
+@functools.lru_cache(maxsize=2048)
+def _kw_re(kw):
+    return re.compile(r"\b" + re.escape(kw.strip()) + r"\b")
+
+
+def _matches(kw, text):
+    return _kw_re(kw).search(text) is not None
+
+
 def classify_field(title):
     t = title.lower()
+    # a finance/business risk title is never cybersecurity
+    cyber_blocked = any(p in t for p in NON_CYBER_RISK)
     best, best_hits, best_kw = None, 0, None
     for field in FIELD_PRIORITY:
+        if field == "cybersecurity" and cyber_blocked:
+            continue
         kws = FIELD_PROFILES[field]["title"]
-        matched = [k for k in kws if k in t]
+        matched = [k for k in kws if _matches(k, t)]   # whole-word match, no substrings
         if len(matched) > best_hits:
             best, best_hits, best_kw = field, len(matched), matched[0]
     if best is None:

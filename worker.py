@@ -30,7 +30,7 @@ STALE_DAYS = int(os.environ.get("INLET_STALE_DAYS", "4"))       # expire roles n
 
 
 def _company_dict(c):
-    base = {"name": c.name, "tier": c.tier or 3, "id": c.id}
+    base = {"name": c.name, "tier": c.tier or 3, "id": c.id, "platform": c.platform}
     if c.platform == "workday" and c.wd_tenant:
         base["workday"] = {"tenant": c.wd_tenant, "pod": c.wd_pod, "site": c.wd_site}
     else:
