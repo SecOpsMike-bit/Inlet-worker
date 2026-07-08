@@ -158,7 +158,7 @@ def sr_location(loc):
     return s
 
 
-def fetch_smartrecruiters(slug, cap=200):
+def fetch_smartrecruiters(slug, cap=200, known=None):
     base = f"https://api.smartrecruiters.com/v1/companies/{slug}/postings"
     out, offset = [], 0
     while offset < cap:
@@ -169,7 +169,10 @@ def fetch_smartrecruiters(slug, cap=200):
         for p in content:
             pid = p.get("id")
             url = f"https://jobs.smartrecruiters.com/{slug}/{pid}"
-            text = _sr_detail(slug, pid) or p.get("name", "")
+            if known and url in known:              # already have it: reuse, skip detail call
+                text = known[url] or p.get("name", "")
+            else:
+                text = _sr_detail(slug, pid) or p.get("name", "")
             out.append(_job(p.get("name"), sr_location(p.get("location")), url,
                             p.get("releasedDate", ""), text))
         offset += 100
@@ -209,7 +212,7 @@ WORKDAY_TERMS = ["security", "software engineer", "developer", "data", "analyst"
                  "product manager", "project manager", "finance", "accounting",
                  "marketing", "sales", "operations"]
 
-def fetch_workday(tenant, pod, site, per_term=20, cap=120):
+def fetch_workday(tenant, pod, site, per_term=20, cap=120, known=None):
     base = f"https://{tenant}.{pod}.myworkdayjobs.com"
     cxs = f"{base}/wday/cxs/{tenant}/{site}"
     seen, out = set(), []
@@ -230,7 +233,10 @@ def fetch_workday(tenant, pod, site, per_term=20, cap=120):
                 if url in seen:
                     continue
                 seen.add(url)
-                text = _workday_detail(cxs, ext) or p.get("title", "")
+                if known and url in known:          # already have it: reuse, skip detail call
+                    text = known[url] or p.get("title", "")
+                else:
+                    text = _workday_detail(cxs, ext) or p.get("title", "")
                 out.append(_job(p.get("title"), p.get("locationsText", ""), url,
                                 _workday_date(p.get("postedOn", "")), text))
             offset += 20
@@ -266,13 +272,17 @@ _FETCHERS = {"greenhouse": fetch_greenhouse, "lever": fetch_lever,
              "ashby": fetch_ashby, "smartrecruiters": fetch_smartrecruiters}
 
 
-def pull_company(company):
+def pull_company(company, known=None):
+    """known: {url: description} of roles already stored for this company.
+    Lets Workday/SmartRecruiters skip the per-role detail fetch for unchanged roles."""
     try:
         if "workday" in company:
             w = company["workday"]
-            return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"]) if j]
+            return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], known=known) if j]
         platform = company.get("platform")
-        if platform in _FETCHERS:                     # known platform -> fetch directly
+        if platform == "smartrecruiters":
+            return [j for j in fetch_smartrecruiters(company["slug"], known=known) if j]
+        if platform in _FETCHERS:                     # greenhouse/lever/ashby: list already has text
             return [j for j in _FETCHERS[platform](company["slug"]) if j]
         _, jobs = discover(company["slug"])           # unknown -> auto-detect
         return jobs

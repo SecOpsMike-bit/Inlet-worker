@@ -24,7 +24,7 @@ import db
 import engine as eng
 from directory import DIRECTORY
 
-SLICE_SIZE = int(os.environ.get("INLET_SLICE_SIZE", "45"))       # max companies per run
+SLICE_SIZE = int(os.environ.get("INLET_SLICE_SIZE", "120"))       # max companies per run
 TIME_BUDGET = int(os.environ.get("INLET_TIME_BUDGET", "1200"))  # seconds, ~23 min
 STALE_DAYS = int(os.environ.get("INLET_STALE_DAYS", "4"))       # expire roles not seen in N days
 
@@ -102,7 +102,10 @@ def refresh(demo=False):
             if processed >= SLICE_SIZE or (time.time() - started) > TIME_BUDGET:
                 break
             cd = _company_dict(c)
-            jobs = eng.pull_company(cd)
+            # roles we already have for this company: reused so slow feeds skip detail fetches
+            known = {r.url: r.description for r in
+                     s.query(db.Role.url, db.Role.description).filter(db.Role.company_id == c.id)}
+            jobs = eng.pull_company(cd, known=known)
             if jobs:
                 rows = [eng.process(j, cd) for j in jobs]
                 rows = [r for r in rows if r]
