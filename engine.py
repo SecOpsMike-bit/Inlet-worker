@@ -57,11 +57,18 @@ FIELD_PROFILES = {
     "operations": {"label": "Operations", "title": [
         "operations", "supply chain", "logistics", "process improvement",
         "fulfilment", "fulfillment", "procurement", "ops"]},
+    "customer_support": {"label": "Customer Support", "title": [
+        "customer support", "customer service", "customer care", "customer success",
+        "client success", "client services", "client support", "support specialist",
+        "support agent", "support representative", "support analyst", "help desk",
+        "helpdesk", "service desk", "technical support", "customer experience",
+        "member services", "customer advocate", "contact center", "call center",
+        "call centre", "customer relations"]},
 }
 # resolve ties in this order (more specific fields first)
 FIELD_PRIORITY = ["cybersecurity", "data_analytics", "product_management",
-                  "project_management", "software_engineering", "finance_accounting",
-                  "marketing", "sales", "operations"]
+                  "project_management", "customer_support", "software_engineering",
+                  "finance_accounting", "marketing", "sales", "operations"]
 
 SENIOR_TOKENS = ["senior", "sr ", "sr.", "lead ", "principal", "staff ", "director",
                  "head of", " vp", "vice president", "chief", " iii", " iv"]
