@@ -31,6 +31,28 @@ class MatchV2Tests(unittest.TestCase):
         self.assertTrue(r["accepted"])
         self.assertGreaterEqual(r["score"], 80)
 
+    def test_junior_security_operations_engineer_is_accepted(self):
+        j = self.job(
+            "Security Operations Engineer",
+            "1-3 years of experience in a Security Engineering level role. Previous SOC analyst experience is a strong plus. "
+            "Work closely with senior engineers and assist in development, testing and maintenance of SOAR playbooks, "
+            "security automation workflows and API integrations. Exposure to SIEM, EDR and threat intelligence platforms. "
+            "Foundational Python scripting, technical documentation, MITRE ATT&CK and Security+ or CySA+ are great to have."
+        )
+        r = match_v2.explain_cyber_match(j)
+        self.assertTrue(r["accepted"])
+        self.assertEqual(r["lane"], "Security Operations Engineer")
+        self.assertGreaterEqual(r["score"], 70)
+
+    def test_advanced_security_engineer_is_rejected(self):
+        j = self.job(
+            "Security Operations Engineer",
+            "Requires 6 years of security engineering experience. Design enterprise-scale SOAR architecture, own platform "
+            "engineering strategy, lead complex integrations and mentor engineering teams."
+        )
+        r = match_v2.explain_cyber_match(j)
+        self.assertFalse(r["accepted"])
+
     def test_senior_role_is_rejected(self):
         j = self.job(
             "Senior SOC Analyst",
