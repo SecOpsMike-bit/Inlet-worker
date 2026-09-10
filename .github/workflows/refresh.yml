@@ -21,4 +21,4 @@ jobs:
       - name: Run the worker
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python worker.py
+        run: python worker_v2.py
