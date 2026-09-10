@@ -18,4 +18,4 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run match tests
-        run: python -m unittest -v test_match_v2.py test_benchmark_v2.py
+        run: python -m unittest discover -v -p 'test_*.py'
