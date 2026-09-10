@@ -6,7 +6,7 @@ but makes cybersecurity ranking answer a more useful question:
     Is this a realistic SOC / MDR / incident-response role for this profile?
 
 The profile is intentionally explicit and auditable rather than AI-generated at
-runtime.  It can later be moved to user configuration / database storage once the
+runtime. It can later be moved to user configuration / database storage once the
 scoring behaviour is proven.
 """
 
@@ -34,6 +34,9 @@ TARGET_TITLE_SIGNALS = [
     ("Security Analyst", 12, ("junior security analyst", "security analyst")),
     ("Security Operations Specialist", 12, ("security operations specialist",)),
     ("Security Specialist", 10, ("security specialist",)),
+    # Some employers use an Engineer title for an early-career SOC automation role.
+    # This is only allowed through a guarded exception in _title_lane below.
+    ("Security Operations Engineer", 8, ("security operations engineer",)),
     ("Threat Analyst", 8, ("threat analyst",)),
     ("Monitoring Analyst", 8, ("security monitoring analyst", "monitoring analyst")),
     ("Security Consultant", 6, ("security consultant", "cybersecurity consultant", "cyber security consultant")),
@@ -51,15 +54,15 @@ OFF_LANE_TITLE_TERMS = (
 )
 
 CYBER_OPS_EVIDENCE = (
-    "siem", "edr", "xdr", "security operations center", "soc", "incident response",
+    "siem", "edr", "xdr", "soar", "security operations center", "soc", "incident response",
     "incident handling", "security alert", "alert triage", "threat detection",
     "malware", "phishing", "crowdstrike", "sentinel", "splunk", "defender",
-    "ids/ips", "intrusion detection", "intrusion prevention",
+    "ids/ips", "intrusion detection", "intrusion prevention", "security automation",
 )
 
 
 # ---------------------------------------------------------------------------
-# Candidate skill profile.  Each group is scored once even if several synonyms hit.
+# Candidate skill profile. Each group is scored once even if several synonyms hit.
 
 SKILL_GROUPS = [
     ("Microsoft Sentinel", 12, ("microsoft sentinel", "azure sentinel")),
@@ -68,6 +71,9 @@ SKILL_GROUPS = [
     ("MDR/MSSP/SOC", 10, ("managed detection and response", "managed detection", "mdr",
                             "managed security services", "managed security service", "managed security for customers",
                             "mssp", "security operations center", "soc analyst", "soc environment", "soc experience")),
+    ("SOAR & security automation", 8, ("soar", "security orchestration, automation, and response",
+                                           "security orchestration automation and response", "security automation",
+                                           "automation workflows", "workflow automation")),
     ("SIEM/XDR/EDR", 8, ("siem", "xdr", "edr", "security information and event management")),
     ("Alert triage & investigation", 8, ("alert triage", "security alerts", "event investigation",
                                              "investigate security", "threat analysis", "triage activities",
@@ -92,10 +98,11 @@ SKILL_GROUPS = [
     ("Network security", 4, ("ids/ips", "intrusion detection", "intrusion prevention", "firewall", "vpn")),
     ("MITRE ATT&CK", 4, ("mitre att&ck", "mitre attack")),
     ("Documentation/playbooks", 4, ("playbook", "runbook", "sop", "standard operating procedure",
-                                         "technical documentation", "document findings")),
+                                         "technical documentation", "document findings", "document technical workflows")),
     ("Networking fundamentals", 3, ("tcp/ip", "dns", "http", "smtp", "routing", "switching")),
     ("Threat intelligence", 3, ("threat intelligence", "ioc", "indicator of compromise", "ttp")),
     ("Security certifications", 3, ("security+", "cysa+", "network+", "comptia", "gsec", "gcih", "sc-200")),
+    ("API integrations", 3, ("api integration", "api integrations", "apis", "rest api")),
     ("Python", 3, ("python",)),
 ]
 
@@ -139,7 +146,7 @@ def _has(blob, term):
     term = term.lower().strip()
     if not term:
         return False
-    acronym_terms = {"soc", "mdr", "mssp", "siem", "xdr", "edr", "sop", "ioc", "ttp", "vpn", "dns", "http", "smtp"}
+    acronym_terms = {"soc", "mdr", "mssp", "siem", "xdr", "edr", "soar", "sop", "ioc", "ttp", "vpn", "dns", "http", "smtp"}
     if term in acronym_terms:
         plural = r"s?" if term in {"sop", "ioc", "ttp"} else ""
         return re.search(r"(?<![a-z0-9])" + re.escape(term) + plural + r"(?![a-z0-9])", blob) is not None
@@ -150,31 +157,6 @@ def _count_ops_evidence(blob):
     return sum(1 for term in CYBER_OPS_EVIDENCE if _has(blob, term))
 
 
-def _title_lane(title, text):
-    """Return (lane label, title bonus) or (None, 0) when this is not our cyber lane."""
-    t = _normalise(title)
-    blob = _normalise((title or "") + " " + (text or ""))
-
-    # Engineering is intentionally excluded from this profile's search unless the
-    # employer actually titles it as an analyst role as well.
-    if "engineer" in t and "analyst" not in t:
-        return None, 0
-    if any(term in t for term in OFF_LANE_TITLE_TERMS):
-        return None, 0
-
-    ops_evidence = _count_ops_evidence(blob)
-    for label, bonus, phrases in TARGET_TITLE_SIGNALS:
-        if any(phrase in t for phrase in phrases):
-            # Broad titles such as Security Specialist / Threat Analyst / Consultant
-            # need evidence that the job is really blue-team operations.
-            if label in {"Security Specialist", "Threat Analyst", "Monitoring Analyst", "Security Consultant",
-                         "Security Analyst", "Information Security Analyst", "Cyber Security Analyst"}:
-                if ops_evidence < 2:
-                    return None, 0
-            return label, bonus
-    return None, 0
-
-
 def _required_years(text):
     """Extract candidate-facing experience requirements, avoiding company-history numbers."""
     s = _normalise(text)
@@ -183,7 +165,7 @@ def _required_years(text):
         # "minimum of 5 years ...", "you have 3+ years ...", "requires 4 years ..."
         r"(?:minimum(?:\s+of)?|at\s+least|required|requires|requirement[s]?|must\s+have|you\s+(?:have|bring|possess)|candidates?\s+(?:have|with))[^.;\n]{0,90}?(\d+)\s*\+?\s*years?",
         # "3+ years of relevant experience", "2 years cybersecurity experience"
-        r"(\d+)\s*\+?\s*years?(?:\s+of)?\s+(?:relevant\s+|professional\s+|hands[- ]on\s+)?(?:cybersecurity\s+|cyber\s+security\s+|security\s+|soc\s+|information\s+security\s+|incident\s+response\s+|it\s+|technology\s+|technical\s+)?experience",
+        r"(\d+)\s*\+?\s*years?(?:\s+of)?\s+(?:relevant\s+|professional\s+|hands[- ]on\s+)?(?:cybersecurity\s+|cyber\s+security\s+|security\s+|soc\s+|information\s+security\s+|incident\s+response\s+|security\s+engineering\s+|it\s+|technology\s+|technical\s+)?(?:engineering\s+)?experience",
     ]
     for pattern in patterns:
         for m in re.finditer(pattern, s):
@@ -191,6 +173,50 @@ def _required_years(text):
             if 0 <= y <= 20:
                 found.append(y)
     return max(found) if found else None
+
+
+def _title_lane(title, text):
+    """Return (lane label, title bonus) or (None, 0) when this is not our cyber lane."""
+    t = _normalise(title)
+    blob = _normalise((title or "") + " " + (text or ""))
+
+    if any(term in t for term in OFF_LANE_TITLE_TERMS):
+        return None, 0
+
+    # Do not broadly admit engineering roles. Make one narrow exception for
+    # early-career Security Operations Engineer jobs that are really SOC/SOAR
+    # support roles rather than advanced security engineering.
+    if "engineer" in t and "analyst" not in t:
+        if "security operations engineer" not in t:
+            return None, 0
+        years = _required_years(text)
+        if years is not None and years > 3:
+            return None, 0
+        junior_cues = (
+            "1–3 years", "1-3 years", "1 to 3 years", "under the guidance", "under guidance",
+            "work closely with senior", "assist in", "assist with", "foundational",
+            "gain hands-on experience", "developing your own technical skills", "strong plus",
+        )
+        automation_cues = (
+            "soar", "security automation", "playbook", "workflow", "api integration", "api integrations",
+        )
+        if not any(cue in blob for cue in junior_cues):
+            return None, 0
+        if not any(_has(blob, cue) for cue in automation_cues):
+            return None, 0
+
+    ops_evidence = _count_ops_evidence(blob)
+    for label, bonus, phrases in TARGET_TITLE_SIGNALS:
+        if any(phrase in t for phrase in phrases):
+            # Broad titles need evidence that the job is really blue-team operations.
+            if label in {"Security Specialist", "Threat Analyst", "Monitoring Analyst", "Security Consultant",
+                         "Security Analyst", "Information Security Analyst", "Cyber Security Analyst"}:
+                if ops_evidence < 2:
+                    return None, 0
+            if label == "Security Operations Engineer" and ops_evidence < 3:
+                return None, 0
+            return label, bonus
+    return None, 0
 
 
 def _skill_match(text):
@@ -292,7 +318,7 @@ def explain_cyber_match(job):
 
 
 def _looks_cyber_target(job):
-    """Cheap pre-check so MDR/Falcon titles can bypass the old field classifier."""
+    """Cheap pre-check so MDR/Falcon/SecOps titles can bypass the old field classifier."""
     t = _normalise(job.get("title", ""))
     if any(phrase in t for _, _, phrases in TARGET_TITLE_SIGNALS for phrase in phrases):
         return True
