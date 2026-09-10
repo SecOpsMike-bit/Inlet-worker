@@ -51,7 +51,7 @@ OFF_LANE_TITLE_TERMS = (
 )
 
 CYBER_OPS_EVIDENCE = (
-    "siem", "edr", "xdr", "security operations center", " soc ", "incident response",
+    "siem", "edr", "xdr", "security operations center", "soc", "incident response",
     "incident handling", "security alert", "alert triage", "threat detection",
     "malware", "phishing", "crowdstrike", "sentinel", "splunk", "defender",
     "ids/ips", "intrusion detection", "intrusion prevention",
@@ -70,13 +70,16 @@ SKILL_GROUPS = [
                             "security operations center", "soc analyst", "soc environment")),
     ("SIEM/XDR/EDR", 8, ("siem", "xdr", "edr", "security information and event management")),
     ("Alert triage & investigation", 8, ("alert triage", "security alerts", "event investigation",
-                                             "investigate security", "threat analysis", "triage activities")),
+                                             "investigate security", "threat analysis", "triage activities",
+                                             "triage", "security investigation", "incident investigation")),
     ("Incident response & escalation", 8, ("incident response", "incident handling", "incident escalation",
-                                                "escalation management", "containment", "remediation requirements")),
+                                                "escalation management", "containment", "remediation requirements",
+                                                "cyber incident", "security incident", "incident remediation",
+                                                "remediate", "resolve cyber incidents")),
     ("Detection/SIEM tuning", 7, ("siem tuning", "detection tuning", "rule tuning", "analytics rule",
                                       "correlation rule", "false positive", "use case development",
                                       "detection engineering")),
-    ("Microsoft Defender", 6, ("microsoft defender", "defender for endpoint", "mde")),
+    ("Microsoft Defender", 6, ("microsoft defender", "defender for endpoint", "mde", "defender")),
     ("Ticket/SLA lifecycle", 6, ("ticket", "case management", "service desk", "sla",
                                      "service level agreement", "case documentation")),
     ("Phishing & malware", 6, ("phishing", "malware")),
@@ -136,8 +139,10 @@ def _has(blob, term):
     term = term.lower().strip()
     if not term:
         return False
-    if term in ("mdr", "mssp", "siem", "xdr", "edr", "sop", "ioc", "ttp", "vpn", "dns", "http", "smtp"):
-        return re.search(r"(?<![a-z0-9])" + re.escape(term) + r"(?![a-z0-9])", blob) is not None
+    acronym_terms = {"soc", "mdr", "mssp", "siem", "xdr", "edr", "sop", "ioc", "ttp", "vpn", "dns", "http", "smtp"}
+    if term in acronym_terms:
+        plural = r"s?" if term in {"sop", "ioc", "ttp"} else ""
+        return re.search(r"(?<![a-z0-9])" + re.escape(term) + plural + r"(?![a-z0-9])", blob) is not None
     return term in blob
 
 
