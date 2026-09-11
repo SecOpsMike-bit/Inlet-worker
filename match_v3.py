@@ -25,6 +25,15 @@ OUTSIDE_ON_TERMS = (
     "montreal", "montréal", "winnipeg", "halifax", " ab", " bc", " qc", " mb", " sk", " ns",
 )
 
+SOC_OPS_EVIDENCE = (
+    "soc", "security operations center", "security operations centre",
+    "managed detection and response", "mdr", "siem", "microsoft sentinel", "splunk",
+    "xdr", "edr", "endpoint detection and response", "alert triage",
+    "triage security alerts", "triage alerts", "incident response", "incident handling",
+    "incident escalation", "escalate incidents", "security monitoring", "security alerts",
+    "threat detection",
+)
+
 SKILL_SYNONYMS = {
     "microsoft sentinel": ("microsoft sentinel", "azure sentinel"),
     "splunk": ("splunk",),
@@ -85,7 +94,12 @@ def _required_years(text):
     return max(years) if years else None
 
 
-def _title_fit(title, profile):
+def _soc_evidence_count(text):
+    blob = _norm(text)
+    return sum(1 for term in SOC_OPS_EVIDENCE if term in blob)
+
+
+def _title_fit(title, text, profile):
     t = _norm(title)
     excluded = [x.lower() for x in profile.get("excluded_titles", [])]
     if any(term in t for term in excluded):
@@ -98,7 +112,9 @@ def _title_fit(title, profile):
     if any(term in t for term in targets):
         return 100, "target_title"
     if any(term in t for term in conditional):
-        return 72, "conditional_title"
+        if _soc_evidence_count(text) < 2:
+            return 0, "conditional_title_without_soc_evidence"
+        return 90, "conditional_title_with_soc_evidence"
     return 0, "off_target_title"
 
 
@@ -113,8 +129,6 @@ def _skills(job_text, profile):
         if any(term in blob for term in synonyms):
             matched.append(skill)
 
-    # Missing skills are only inferred from known V3 groups explicitly mentioned
-    # in the job; this avoids inventing requirements the posting never stated.
     for skill, synonyms in SKILL_SYNONYMS.items():
         if skill in profile_skills:
             continue
@@ -145,7 +159,6 @@ def _experience_score(text, profile):
 
 def _onsite_frequency_penalty(text):
     blob = _norm(text)
-    # More specific patterns first.
     if re.search(r"(?:3|three)\s+days?\s+(?:per|a)\s+week", blob):
         return 35, "hybrid_3_days_week"
     if re.search(r"(?:2|two)\s+days?\s+(?:per|a)\s+week", blob):
@@ -216,7 +229,7 @@ def evaluate(job, profile):
     location = job.get("location_raw") or job.get("location") or ""
     posted = job.get("posted_at") or job.get("posted")
 
-    title_score, title_reason = _title_fit(title, profile)
+    title_score, title_reason = _title_fit(title, text, profile)
     if title_score == 0:
         return {
             "overall_score": 0,
@@ -237,8 +250,6 @@ def evaluate(job, profile):
     elif warnings:
         eligibility = "warning"
 
-    # Title fit gates lane relevance but is not a separate display metric in V3.
-    # It acts as a multiplier so conditional titles need stronger evidence elsewhere.
     base = round(
         0.45 * skills_score +
         0.20 * experience_score +
@@ -274,5 +285,6 @@ def evaluate(job, profile):
             "required_years": required_years,
             "age_days": age_days,
             "location": location,
+            "soc_evidence_count": _soc_evidence_count(text),
         },
     }
