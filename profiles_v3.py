@@ -32,6 +32,8 @@ CYBERSECURITY_BETA_PROFILE = {
         "security consultant",
         "cyber defense analyst",
         "cyber defence analyst",
+        "cyber automation analyst",
+        "idps cyber automation analyst",
     ],
     "excluded_titles": [
         "senior",
