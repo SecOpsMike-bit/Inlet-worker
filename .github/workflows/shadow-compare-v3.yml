@@ -1,0 +1,22 @@
+name: Shadow compare V2 vs V3
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compare V2 and V3 on live raw jobs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python shadow_compare_v3.py --companies 40
