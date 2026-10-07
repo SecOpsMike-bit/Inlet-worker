@@ -205,6 +205,41 @@ def _location_score(location, text, profile):
     return 0, "location_incompatible"
 
 
+def _hard_eligibility_failures(job, profile):
+    """Return explicit non-skill blockers that make a job ineligible.
+
+    These checks intentionally outrank keyword/skills similarity. A remote label
+    must not rescue a posting whose description says the candidate must already
+    hold a specific client badge or be based in a conflicting geography.
+    """
+    text = " ".join(str(job.get(k, "") or "") for k in (
+        "description", "text", "location_raw", "location", "employment_type",
+        "work_authorization", "remote_type",
+    ))
+    blob = _norm(text)
+    credentials = " ".join(str(x).lower() for x in profile.get("eligibility_credentials", []))
+    failures = []
+
+    cdc_required = (
+        re.search(r"\bmust\s+be\s+cdc\s+badged\b", blob)
+        or re.search(r"\bactive\s+cdc\s+(?:badge|credentials?)\b", blob)
+        or re.search(r"\bpossession\s+of\s+(?:an?\s+)?active\s+cdc\s+(?:badge|credentials?)\b", blob)
+    )
+    if cdc_required and not any(x in credentials for x in ("cdc badge", "cdc badged", "cdc credential")):
+        failures.append("requires_cdc_badge")
+
+    # Current beta profile is Canada-based. Catch explicit US-locality constraints
+    # that are easy to miss when an aggregator labels the role simply "Remote".
+    country = str(profile.get("country", "")).lower()
+    if country == "canada":
+        if re.search(r"\b(?:atl|atlanta)\s+metro\s+based\b", blob):
+            failures.append("requires_atlanta_metro")
+        if re.search(r"\b(?:w2\s+only|contract\s+w2)\b", blob):
+            failures.append("us_w2_only")
+
+    return failures
+
+
 def _opportunity_score(posted):
     age = _age_days(posted)
     if age is None:
@@ -226,6 +261,17 @@ def evaluate(job, profile):
     """Evaluate a raw job against one profile and return an explainable result."""
     title = job.get("title", "")
     text = job.get("description") or job.get("text") or ""
+
+    hard_failures = _hard_eligibility_failures(job, profile)
+    if hard_failures:
+        return {
+            "overall_score": 0,
+            "eligibility_status": "fail",
+            "recommendation": "skip",
+            "reason": "hard_eligibility_blocker",
+            "warnings": hard_failures,
+            "explanation": {"hard_eligibility_failures": hard_failures},
+        }
     location = job.get("location_raw") or job.get("location") or ""
     posted = job.get("posted_at") or job.get("posted")
 
