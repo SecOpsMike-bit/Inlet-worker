@@ -76,6 +76,19 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
                 "application security requirements and enterprise security design."
             ),
 
+            # The HLB/Dice: aggregator says "Remote" and the title looks plausible,
+            # but the description requires an existing CDC badge and Atlanta-metro
+            # presence. Hard eligibility must outrank skill overlap.
+            "hlb_cdc": {
+                "title": "Security Analyst",
+                "location": "Remote",
+                "employment_type": "Contract W2",
+                "text": "MUST BE CDC BADGED and ATL METRO BASED. 5+ years cybersecurity operations. "
+                        "Security monitoring, incident response, vulnerability management, NIST SP 800-53, STIG and POA&M.",
+                "posted": "2026-10-05",
+                "url": "https://www.dice.com/job-detail/0b03b580-7701-4444-a96f-5383555707bd",
+            },
+
             # CrowdStrike-style province constrained remote role. A Toronto-based
             # profile should not see AB/BC-only remote as eligible.
             "crowdstrike_bc": self.job(
@@ -91,6 +104,12 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
         self.assertIn(results["deloitte_idps"]["recommendation"], {"strong_apply", "apply", "maybe"})
         self.assertIn(results["proserveit"]["recommendation"], {"strong_apply", "apply"})
         self.assertIn(results["home_hardware"]["recommendation"], {"apply", "maybe"})
+
+        self.assertEqual(results["hlb_cdc"]["recommendation"], "skip")
+        self.assertEqual(results["hlb_cdc"]["eligibility_status"], "fail")
+        self.assertIn("requires_cdc_badge", results["hlb_cdc"]["warnings"])
+        self.assertIn("requires_atlanta_metro", results["hlb_cdc"]["warnings"])
+        self.assertIn("us_w2_only", results["hlb_cdc"]["warnings"])
 
         self.assertEqual(results["paladin_physical"]["recommendation"], "skip")
         self.assertEqual(results["sunnybrook_senior"]["recommendation"], "skip")
