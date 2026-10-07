@@ -8,6 +8,7 @@ on:
       - 'match_v3.py'
       - 'profiles_v3.py'
       - 'shadow_compare_v3.py'
+      - 'requirements.txt'
       - '.github/workflows/shadow-compare-v3.yml'
 
 jobs:
