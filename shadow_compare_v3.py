@@ -1,8 +1,8 @@
 """Shadow-compare current V2 matching against V3 without changing production data.
 
-This script pulls a sample of currently configured companies, evaluates each raw job
-with both V2 and V3, and prints disagreement summaries. It does not write roles,
-jobs, matches, or applications to the database.
+By default this uses the built-in company directory and pulls current jobs directly
+from employer ATS feeds. That keeps the comparison independent of the production
+database. A database-backed source remains available for deeper manual runs.
 """
 
 import argparse
@@ -12,6 +12,7 @@ import db
 import engine as eng
 import match_v2
 import match_v3
+from directory import DIRECTORY
 from profiles_v3 import CYBERSECURITY_BETA_PROFILE
 
 
@@ -22,6 +23,13 @@ def _company_dict(c):
     else:
         base["slug"] = c.slug
     return base
+
+
+def _directory_company_dict(c, index):
+    out = dict(c)
+    out["id"] = -(index + 1)
+    out["platform"] = "workday" if "workday" in out else "auto"
+    return out
 
 
 def _v2_decision(job, company):
@@ -37,24 +45,30 @@ def _v3_decision(job):
     return result.get("recommendation", "skip"), result
 
 
-def run(limit=40):
+def _companies(limit, source):
+    if source == "directory":
+        return [_directory_company_dict(c, i) for i, c in enumerate(DIRECTORY[:limit])], None
+
     db.init_db()
     session = db.Session()
-    try:
-        companies = (
-            session.query(db.Company)
-            .filter(db.Company.active == True)
-            .order_by(db.Company.last_checked.desc().nullslast())
-            .limit(limit)
-            .all()
-        )
+    companies = (
+        session.query(db.Company)
+        .filter(db.Company.active == True)
+        .order_by(db.Company.last_checked.desc().nullslast())
+        .limit(limit)
+        .all()
+    )
+    return [_company_dict(c) for c in companies], session
 
+
+def run(limit=40, source="directory"):
+    companies, session = _companies(limit, source)
+    try:
         rows = []
         fetched_companies = 0
         raw_jobs = 0
 
-        for company in companies:
-            cd = _company_dict(company)
+        for cd in companies:
             jobs = eng.pull_company(cd) or []
             if not jobs:
                 continue
@@ -69,7 +83,7 @@ def run(limit=40):
 
                 if disagree:
                     rows.append({
-                        "company": company.name,
+                        "company": cd.get("name"),
                         "title": job.get("title"),
                         "location": job.get("location"),
                         "url": job.get("url"),
@@ -83,18 +97,22 @@ def run(limit=40):
                     })
 
         print(json.dumps({
+            "source": source,
             "companies_requested": limit,
+            "companies_available": len(companies),
             "companies_with_jobs": fetched_companies,
             "raw_jobs_evaluated": raw_jobs,
             "disagreements": len(rows),
             "rows": rows,
         }, indent=2, default=str))
     finally:
-        session.close()
+        if session is not None:
+            session.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare V2 and V3 matching on live raw jobs")
     parser.add_argument("--companies", type=int, default=40)
+    parser.add_argument("--source", choices=("directory", "db"), default="directory")
     args = parser.parse_args()
-    run(limit=args.companies)
+    run(limit=args.companies, source=args.source)
