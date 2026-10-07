@@ -26,6 +26,7 @@ CYBERSECURITY_BETA_PROFILE = {
         "security monitoring analyst",
     ],
     "conditional_titles": [
+        "security analyst",
         "security specialist",
         "information security analyst",
         "threat analyst",
@@ -86,6 +87,8 @@ CYBERSECURITY_BETA_PROFILE = {
         "hamilton",
     ],
     "remote_preference": "canada_remote",
+    "country": "canada",
+    "eligibility_credentials": [],
     # Confirmed-profile skills should eventually come from the user's parsed resume
     # and onboarding answers. The beta values below reflect the current test profile.
     "skills": [
