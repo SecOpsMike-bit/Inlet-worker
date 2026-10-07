@@ -2,6 +2,13 @@ name: Shadow compare V2 vs V3
 
 on:
   workflow_dispatch:
+  push:
+    branches: [v3-profile-matching]
+    paths:
+      - 'match_v3.py'
+      - 'profiles_v3.py'
+      - 'shadow_compare_v3.py'
+      - '.github/workflows/shadow-compare-v3.yml'
 
 jobs:
   compare:
