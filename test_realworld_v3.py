@@ -102,6 +102,53 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
         self.assertEqual(result["recommendation"], "skip")
         self.assertIn("us_skillbridge_program", result["warnings"])
 
+    def test_live_shadow_candidates_from_october_2026(self):
+        """Regression cases from the 2026-10-08 ATS shadow comparison.
+
+        The CDW description is a concise paraphrase of its published posting.
+        The other examples preserve the exact title/location eligibility signals
+        that caused the earlier false-positive recommendations.
+        """
+        cdw = self.job(
+            "Security Specialist",
+            "Mississauga / Forsythe - ON 44",
+            "Second-level cybersecurity incident response in a managed detection "
+            "and response SOC, primarily Microsoft Sentinel and Defender. "
+            "Monitor, triage, investigate, remediate and escalate incidents; "
+            "perform root cause analysis, improve SIEM analytics, reduce false "
+            "positives and provide client support. Requires 1 year of security "
+            "experience and at least two intermediate-level security certifications.",
+            posted="2026-10-01",
+        )
+        us = self.job(
+            "Analyst I, Falcon Complete (Hybrid, San Antonio)",
+            "USA - Remote",
+            "Managed detection and response, EDR, SIEM, alert triage, "
+            "security monitoring, incident response.",
+            posted="2026-10-07",
+        )
+        uk = self.job(
+            "Analyst I, Falcon Complete (Remote, GBR)",
+            "United Kingdom - Remote",
+            "Managed detection and response, EDR, SIEM, alert triage, "
+            "security monitoring, incident response.",
+            posted="2026-10-07",
+        )
+        skillbridge = self.job(
+            "Analyst, Falcon Complete - SkillBridge",
+            "USA - St. Louis, MO",
+            "Managed detection and response, EDR, SIEM, alert triage, "
+            "security monitoring, incident response.",
+            posted="2026-10-07",
+        )
+        cdw_result = evaluate(cdw, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(cdw_result["recommendation"], {"apply", "maybe", "strong_apply"})
+        for case in (us, uk, skillbridge):
+            with self.subTest(title=case["title"]):
+                result = evaluate(case, CYBERSECURITY_BETA_PROFILE)
+                self.assertEqual(result["recommendation"], "skip")
+                self.assertEqual(result["eligibility_status"], "fail")
+
     def test_current_market_examples(self):
         cases = {
             # CDW Toronto: genuine SOC L2 work: SIEM/SOAR/tickets, triage,
