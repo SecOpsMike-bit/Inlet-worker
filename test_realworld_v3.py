@@ -143,6 +143,7 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
         )
         cdw_result = evaluate(cdw, CYBERSECURITY_BETA_PROFILE)
         self.assertIn(cdw_result["recommendation"], {"apply", "maybe", "strong_apply"})
+        self.assertIn("verify_two_intermediate_security_certifications", cdw_result["warnings"])
         for case in (us, uk, skillbridge):
             with self.subTest(title=case["title"]):
                 result = evaluate(case, CYBERSECURITY_BETA_PROFILE)
