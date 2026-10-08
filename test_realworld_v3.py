@@ -55,6 +55,52 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
         self.assertEqual(restricted_result["eligibility_status"], "fail")
         self.assertEqual(senior_result["recommendation"], "skip")
 
+    def test_foreign_remote_is_not_canada_eligible(self):
+        """ATS 'Remote' jobs outside Canada must never reach Apply/Maybe."""
+        description = (
+            "Managed detection and response virtual SOC: SIEM, EDR, "
+            "security monitoring, alert triage, incident response, Windows, "
+            "Linux, malware investigation, client-facing remediation."
+        )
+        foreign_locations = [
+            "USA - Remote",
+            "United Kingdom - Remote",
+            "United States",
+            "Remote - US",
+            "India - Remote",
+            "Remote, Denmark",
+        ]
+        for location in foreign_locations:
+            with self.subTest(location=location):
+                result = evaluate(
+                    self.job("Analyst I, Falcon Complete (Remote)", location, description,
+                             posted="2026-10-07"),
+                    CYBERSECURITY_BETA_PROFILE,
+                )
+                self.assertEqual(result["recommendation"], "skip")
+                self.assertEqual(result["eligibility_status"], "fail")
+                self.assertIn("foreign_country_restricted", result["warnings"])
+
+        canadian = evaluate(
+            self.job("Analyst I, Falcon Complete (Remote)", "Canada - Remote ON",
+                     description, posted="2026-10-07"),
+            CYBERSECURITY_BETA_PROFILE,
+        )
+        self.assertIn(canadian["recommendation"], {"strong_apply", "apply", "maybe"})
+
+    def test_skillbridge_is_not_regular_entry_level_opening(self):
+        description = (
+            "Virtual SOC managed detection and response, SIEM, EDR, "
+            "security monitoring, alert triage, incident response, malware."
+        )
+        result = evaluate(
+            self.job("Analyst, Falcon Complete - SkillBridge",
+                     "Canada - Remote ON", description, posted="2026-10-07"),
+            CYBERSECURITY_BETA_PROFILE,
+        )
+        self.assertEqual(result["recommendation"], "skip")
+        self.assertIn("us_skillbridge_program", result["warnings"])
+
     def test_current_market_examples(self):
         cases = {
             # CDW Toronto: genuine SOC L2 work: SIEM/SOAR/tickets, triage,
