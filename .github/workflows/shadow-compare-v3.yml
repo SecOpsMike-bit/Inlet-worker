@@ -1,0 +1,42 @@
+name: Shadow compare V2 vs V3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3-profile-matching]
+    paths:
+      - 'match_v3.py'
+      - 'directory.py'
+      - 'engine.py'
+      - 'profiles_v3.py'
+      - 'shadow_compare_v3.py'
+      - 'requirements.txt'
+      - '.github/workflows/shadow-compare-v3.yml'
+
+concurrency:
+  group: v3-shadow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compare V2 and V3 on live raw jobs
+        run: python shadow_compare_v3.py --companies 40 --source directory --output shadow-report-v3.json
+      - name: Upload full comparison diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-report-v3
+          path: shadow-report-v3.json
+          if-no-files-found: warn
+          retention-days: 7

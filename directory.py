@@ -7,6 +7,7 @@ DIRECTORY = [
     {"name": "Cyderes",            "tier": 1, "slug": "cyderes"},                 # confirmed: Lever
     {"name": "Arctic Wolf",        "tier": 1, "workday": {"tenant": "arcticwolf", "pod": "wd1", "site": "External"}},        # confirmed
     {"name": "Optiv",              "tier": 1, "workday": {"tenant": "optiv", "pod": "wd5", "site": "Optiv_Careers"}},        # confirmed
+    {"name": "CrowdStrike",        "tier": 1, "workday": {"tenant": "crowdstrike", "pod": "wd5", "site": "crowdstrikecareers"}}, # verified employer Workday
     # Still to resolve (find each careers URL, then convert to a workday{} entry or correct slug):
     {"name": "eSentire",           "tier": 1, "slug": "esentire"},
     {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect"},
@@ -14,6 +15,8 @@ DIRECTORY = [
 
     # Tier 2 - finance / fintech (high volume; Workday)
     {"name": "RBC",                "tier": 2, "workday": {"tenant": "rbc", "pod": "wd3", "site": "RBCGLOBAL1"}},          # confirmed
+    {"name": "Finastra",           "tier": 2, "workday": {"tenant": "finastra", "pod": "wd3", "site": "FINC"}},              # verified employer Workday
+    {"name": "CDW",                "tier": 2, "workday": {"tenant": "cdw", "pod": "wd5", "site": "careers"}},                 # verified employer Workday
     {"name": "TELUS International", "tier": 2, "workday": {"tenant": "telusinternational", "pod": "wd3", "site": "External"}},  # confirmed
 
     # Tier 3 - logistics / supply chain / retail (the ops-background edge)
