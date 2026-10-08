@@ -313,6 +313,14 @@ def evaluate(job, profile):
     opportunity_score, age_days = _opportunity_score(posted)
 
     warnings = [w for w in (exp_warning, loc_warning) if w]
+    # Some SOC vacancies demand multiple intermediate vendor/technical
+    # certifications. Don't treat an unspecified certification profile as proof
+    # that this mandatory requirement is met; surface it for manual validation.
+    if re.search(
+        r"(?:at least|minimum(?: of)?)\\s+(?:two|2)\\s+intermediate[- ]level\\s+certifications?",
+        _norm(text),
+    ) and not profile.get("verified_intermediate_security_certifications"):
+        warnings.append("verify_two_intermediate_security_certifications")
     eligibility = "pass"
     if experience_score == 0 or location_score == 0:
         eligibility = "fail"
