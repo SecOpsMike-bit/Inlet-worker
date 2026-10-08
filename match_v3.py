@@ -338,7 +338,19 @@ def evaluate(job, profile):
     else:
         recommendation = "skip"
 
+    # Distinguish genuine eligibility failures from low ranking scores. The
+    # shadow report relies on this to identify why candidates are rejected.
+    if location_score == 0:
+        decision_reason = loc_warning or "location_incompatible"
+    elif experience_score == 0:
+        decision_reason = exp_warning or "experience_incompatible"
+    elif recommendation == "skip":
+        decision_reason = "below_score_threshold"
+    else:
+        decision_reason = title_reason
+
     return {
+        "reason": decision_reason,
         "overall_score": max(0, min(100, overall)),
         "skills_score": skills_score,
         "location_score": location_score,
