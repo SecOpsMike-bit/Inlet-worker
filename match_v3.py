@@ -25,6 +25,21 @@ OUTSIDE_ON_TERMS = (
     "montreal", "montréal", "winnipeg", "halifax", " ab", " bc", " qc", " mb", " sk", " ns",
 )
 
+# These are explicit foreign-country labels found in ATS structured locations.
+# Only inspect the location field: a job description may mention global clients
+# even when the position itself is genuinely open to Canadian applicants.
+FOREIGN_LOCATION_RE = re.compile(
+    r"\\b(?:united states|usa|u\\.?s\\.?a\\.?|us|united kingdom|uk|gbr|"
+    r"india|ind|ireland|germany|france|denmark|sweden|norway|australia|"
+    r"singapore|poland|philippines|brazil|mexico|netherlands)\\b",
+    re.IGNORECASE,
+)
+CANADIAN_LOCATION_RE = re.compile(
+    r"\\b(?:canada|canadian|ontario|toronto|mississauga|north york|"
+    r"brampton|markham|vaughan|waterloo|kitchener|hamilton|on)\\b",
+    re.IGNORECASE,
+)
+
 SOC_OPS_EVIDENCE = (
     "soc", "security operations center", "security operations centre",
     "managed detection and response", "mdr", "siem", "microsoft sentinel", "splunk",
@@ -176,6 +191,12 @@ def _location_score(location, text, profile):
     preferred = [x.lower() for x in profile.get("preferred_locations", [])]
     nearby = [x.lower() for x in profile.get("nearby_ontario_locations", [])]
 
+    # "Remote" does not imply worldwide eligibility. Reject explicit foreign-
+    # only structured locations before checking the description for Canada.
+    if str(profile.get("country", "")).lower() == "canada":
+        if FOREIGN_LOCATION_RE.search(location or "") and not CANADIAN_LOCATION_RE.search(location or ""):
+            return 0, "foreign_country_restricted"
+
     if any(term in loc for term in preferred):
         return 100, None
 
@@ -232,6 +253,8 @@ def _hard_eligibility_failures(job, profile):
     # that are easy to miss when an aggregator labels the role simply "Remote".
     country = str(profile.get("country", "")).lower()
     if country == "canada":
+        if re.search(r"\\bskillbridge\\b", _norm(job.get("title", ""))):
+            failures.append("us_skillbridge_program")
         if re.search(r"\b(?:atl|atlanta)\s+metro\s+based\b", blob):
             failures.append("requires_atlanta_metro")
         if re.search(r"\b(?:w2\s+only|contract\s+w2)\b", blob):
