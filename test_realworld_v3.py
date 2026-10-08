@@ -22,6 +22,39 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
             "url": "https://example.com/realworld-benchmark",
         }
 
+    def test_falcon_complete_titles_without_security_keyword(self):
+        """Role-family names need SOC evidence, and location still overrides fit."""
+        description = (
+            "Virtual SOC analyst for managed detection and response customers. "
+            "Security monitoring, SIEM, EDR, incident response, alert triage, "
+            "malware investigation, Windows and Linux, client-facing remediation."
+        )
+        eligible = self.job(
+            "Analyst I, Falcon Complete (Remote)",
+            "Canada - Remote ON",
+            description,
+            posted="2026-10-07",
+        )
+        restricted = self.job(
+            "Analyst I, Falcon Complete (Remote, PST/MST)",
+            "Canada - Remote AB; Canada - Remote BC",
+            description,
+            posted="2026-10-07",
+        )
+        senior = self.job(
+            "Sr. Analyst, Falcon Complete (Remote)",
+            "Canada - Remote ON",
+            description,
+            posted="2026-10-07",
+        )
+        eligible_result = evaluate(eligible, CYBERSECURITY_BETA_PROFILE)
+        restricted_result = evaluate(restricted, CYBERSECURITY_BETA_PROFILE)
+        senior_result = evaluate(senior, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(eligible_result["recommendation"], {"strong_apply", "apply", "maybe"})
+        self.assertEqual(restricted_result["recommendation"], "skip")
+        self.assertEqual(restricted_result["eligibility_status"], "fail")
+        self.assertEqual(senior_result["recommendation"], "skip")
+
     def test_current_market_examples(self):
         cases = {
             # CDW Toronto: genuine SOC L2 work: SIEM/SOAR/tickets, triage,
