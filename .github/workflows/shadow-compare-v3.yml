@@ -13,6 +13,10 @@ on:
       - 'requirements.txt'
       - '.github/workflows/shadow-compare-v3.yml'
 
+concurrency:
+  group: v3-shadow-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   compare:
     runs-on: ubuntu-latest
