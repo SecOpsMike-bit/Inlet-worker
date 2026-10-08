@@ -67,6 +67,9 @@ def run(limit=40, source="directory"):
         rows = []
         fetched_companies = 0
         raw_jobs = 0
+        v2_kept = 0
+        v3_kept = 0
+        v3_recommendations = []
 
         for cd in companies:
             jobs = eng.pull_company(cd) or []
@@ -80,6 +83,19 @@ def run(limit=40, source="directory"):
                 v3_decision, v3 = _v3_decision(job)
                 v3_keep = v3_decision in {"strong_apply", "apply", "maybe"}
                 disagree = (v2_decision == "keep") != v3_keep
+                if v2_decision == "keep":
+                    v2_kept += 1
+                if v3_keep:
+                    v3_kept += 1
+                    v3_recommendations.append({
+                        "company": cd.get("name"),
+                        "title": job.get("title"),
+                        "location": job.get("location"),
+                        "url": job.get("url"),
+                        "recommendation": v3_decision,
+                        "score": v3.get("overall_score"),
+                        "warnings": v3.get("warnings", []),
+                    })
 
                 if disagree:
                     rows.append({
@@ -102,6 +118,13 @@ def run(limit=40, source="directory"):
             "companies_available": len(companies),
             "companies_with_jobs": fetched_companies,
             "raw_jobs_evaluated": raw_jobs,
+            "v2_kept": v2_kept,
+            "v3_kept": v3_kept,
+            "v3_recommendations": sorted(
+                v3_recommendations,
+                key=lambda row: row["score"] or 0,
+                reverse=True,
+            )[:30],
             "disagreements": len(rows),
             "rows": rows,
         }, indent=2, default=str))
