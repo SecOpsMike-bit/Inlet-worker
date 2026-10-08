@@ -25,4 +25,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compare V2 and V3 on live raw jobs
-        run: python shadow_compare_v3.py --companies 40 --source directory
+        run: python shadow_compare_v3.py --companies 40 --source directory --output shadow-report-v3.json
+      - name: Upload full comparison diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-report-v3
+          path: shadow-report-v3.json
+          if-no-files-found: warn
+          retention-days: 7
