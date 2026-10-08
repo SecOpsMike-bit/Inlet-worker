@@ -317,7 +317,7 @@ def evaluate(job, profile):
     # certifications. Don't treat an unspecified certification profile as proof
     # that this mandatory requirement is met; surface it for manual validation.
     if re.search(
-        r"(?:at least|minimum(?: of)?)\\s+(?:two|2)\\s+intermediate[- ]level\\s+certifications?",
+        r"(?:at least|minimum(?: of)?)\s+(?:two|2)\s+intermediate[- ]level\s+certifications?",
         _norm(text),
     ) and not profile.get("verified_intermediate_security_certifications"):
         warnings.append("verify_two_intermediate_security_certifications")
