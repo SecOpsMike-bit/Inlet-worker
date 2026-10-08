@@ -7,6 +7,9 @@ database. A database-backed source remains available for deeper manual runs.
 
 import argparse
 import json
+import re
+from collections import Counter
+from pathlib import Path
 
 import db
 import engine as eng
@@ -61,7 +64,13 @@ def _companies(limit, source):
     return [_company_dict(c) for c in companies], session
 
 
-def run(limit=40, source="directory"):
+CYBER_TITLE_PATTERN = re.compile(
+    r"\b(?:soc|cyber|security|threat|incident|detection|malware|forensic|vulnerability|infosec)\b",
+    re.IGNORECASE,
+)
+
+
+def run(limit=40, source="directory", output=None):
     companies, session = _companies(limit, source)
     try:
         rows = []
@@ -70,9 +79,15 @@ def run(limit=40, source="directory"):
         v2_kept = 0
         v3_kept = 0
         v3_recommendations = []
+        per_company = []
+        v3_rejection_reasons = Counter()
+        cyber_title_candidates = []
 
         for cd in companies:
             jobs = eng.pull_company(cd) or []
+            company_stats = {"company": cd.get("name"), "raw_jobs": len(jobs),
+                             "v2_kept": 0, "v3_kept": 0, "cyber_title_candidates": 0}
+            per_company.append(company_stats)
             if not jobs:
                 continue
             fetched_companies += 1
@@ -83,10 +98,28 @@ def run(limit=40, source="directory"):
                 v3_decision, v3 = _v3_decision(job)
                 v3_keep = v3_decision in {"strong_apply", "apply", "maybe"}
                 disagree = (v2_decision == "keep") != v3_keep
+                v3_reason = v3.get("reason") or v3.get("explanation", {}).get("title_reason")
+                if not v3_keep:
+                    v3_rejection_reasons[v3_reason or "below_threshold"] += 1
+                if CYBER_TITLE_PATTERN.search(job.get("title") or ""):
+                    company_stats["cyber_title_candidates"] += 1
+                    cyber_title_candidates.append({
+                        "company": cd.get("name"),
+                        "title": job.get("title"),
+                        "location": job.get("location"),
+                        "url": job.get("url"),
+                        "v2": v2_decision,
+                        "v3": v3_decision,
+                        "v3_score": v3.get("overall_score"),
+                        "v3_reason": v3_reason,
+                        "warnings": v3.get("warnings", []),
+                    })
                 if v2_decision == "keep":
                     v2_kept += 1
+                    company_stats["v2_kept"] += 1
                 if v3_keep:
                     v3_kept += 1
+                    company_stats["v3_kept"] += 1
                     v3_recommendations.append({
                         "company": cd.get("name"),
                         "title": job.get("title"),
@@ -112,7 +145,7 @@ def run(limit=40, source="directory"):
                         "required_years": v3.get("explanation", {}).get("required_years"),
                     })
 
-        print(json.dumps({
+        report = {
             "source": source,
             "companies_requested": limit,
             "companies_available": len(companies),
@@ -120,6 +153,10 @@ def run(limit=40, source="directory"):
             "raw_jobs_evaluated": raw_jobs,
             "v2_kept": v2_kept,
             "v3_kept": v3_kept,
+            "per_company": per_company,
+            "v3_rejection_reasons": dict(v3_rejection_reasons.most_common()),
+            "cyber_title_candidates_count": len(cyber_title_candidates),
+            "cyber_title_candidates": cyber_title_candidates,
             "v3_recommendations": sorted(
                 v3_recommendations,
                 key=lambda row: row["score"] or 0,
@@ -127,7 +164,18 @@ def run(limit=40, source="directory"):
             )[:30],
             "disagreements": len(rows),
             "rows": rows,
-        }, indent=2, default=str))
+        }
+        if output:
+            Path(output).write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+        summary = {key: report[key] for key in (
+            "source", "companies_available", "companies_with_jobs",
+            "raw_jobs_evaluated", "v2_kept", "v3_kept",
+            "cyber_title_candidates_count", "disagreements",
+            "per_company", "v3_rejection_reasons",
+        )}
+        summary["cyber_title_candidates_preview"] = cyber_title_candidates[:35]
+        summary["v3_recommendations"] = report["v3_recommendations"]
+        print(json.dumps(summary, indent=2, default=str))
     finally:
         if session is not None:
             session.close()
@@ -137,5 +185,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare V2 and V3 matching on live raw jobs")
     parser.add_argument("--companies", type=int, default=40)
     parser.add_argument("--source", choices=("directory", "db"), default="directory")
+    parser.add_argument("--output", help="Optional path for full JSON diagnostic report")
     args = parser.parse_args()
-    run(limit=args.companies, source=args.source)
+    run(limit=args.companies, source=args.source, output=args.output)
