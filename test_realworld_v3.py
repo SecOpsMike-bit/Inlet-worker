@@ -80,6 +80,7 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
                 self.assertEqual(result["recommendation"], "skip")
                 self.assertEqual(result["eligibility_status"], "fail")
                 self.assertIn("foreign_country_restricted", result["warnings"])
+                self.assertEqual(result["reason"], "foreign_country_restricted")
 
         canadian = evaluate(
             self.job("Analyst I, Falcon Complete (Remote)", "Canada - Remote ON",
