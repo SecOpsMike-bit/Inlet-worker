@@ -29,14 +29,14 @@ OUTSIDE_ON_TERMS = (
 # Only inspect the location field: a job description may mention global clients
 # even when the position itself is genuinely open to Canadian applicants.
 FOREIGN_LOCATION_RE = re.compile(
-    r"\\b(?:united states|usa|u\\.?s\\.?a\\.?|us|united kingdom|uk|gbr|"
+    r"\b(?:united states|usa|u\.?s\.?a\.?|us|united kingdom|uk|gbr|"
     r"india|ind|ireland|germany|france|denmark|sweden|norway|australia|"
-    r"singapore|poland|philippines|brazil|mexico|netherlands)\\b",
+    r"singapore|poland|philippines|brazil|mexico|netherlands)\b",
     re.IGNORECASE,
 )
 CANADIAN_LOCATION_RE = re.compile(
-    r"\\b(?:canada|canadian|ontario|toronto|mississauga|north york|"
-    r"brampton|markham|vaughan|waterloo|kitchener|hamilton|on)\\b",
+    r"\b(?:canada|canadian|ontario|toronto|mississauga|north york|"
+    r"brampton|markham|vaughan|waterloo|kitchener|hamilton|on)\b",
     re.IGNORECASE,
 )
 
@@ -253,7 +253,7 @@ def _hard_eligibility_failures(job, profile):
     # that are easy to miss when an aggregator labels the role simply "Remote".
     country = str(profile.get("country", "")).lower()
     if country == "canada":
-        if re.search(r"\\bskillbridge\\b", _norm(job.get("title", ""))):
+        if re.search(r"\bskillbridge\b", _norm(job.get("title", ""))):
             failures.append("us_skillbridge_program")
         if re.search(r"\b(?:atl|atlanta)\s+metro\s+based\b", blob):
             failures.append("requires_atlanta_metro")
