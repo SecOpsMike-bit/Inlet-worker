@@ -31,6 +31,7 @@ CYBERSECURITY_BETA_PROFILE = {
         "information security analyst",
         "threat analyst",
         "security consultant",
+        "falcon complete",  # CrowdStrike MDR/SOC team titles may omit "security"
         "cyber defense analyst",
         "cyber defence analyst",
         "cyber automation analyst",
