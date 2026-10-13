@@ -8,6 +8,7 @@ on:
       - '.github/workflows/probe-priority-feeds-v3.yml'
       - 'dayforce_feed.py'
       - 'shopify_feed.py'
+      - 'jibe_feed.py'
       - 'engine.py'
       - 'directory.py'
 
@@ -33,7 +34,7 @@ jobs:
           from match_v3 import evaluate
           from profiles_v3 import CYBERSECURITY_BETA_PROFILE
 
-          for name in ("eSentire", "TELUS Digital Solutions", "Shopify"):
+          for name in ("eSentire", "TELUS Digital Solutions", "Shopify", "Kinaxis"):
               employer = next(c for c in DIRECTORY if c["name"] == name)
               jobs, diagnostic = pull_company_diagnostic(employer)
               if diagnostic["status"] != "ok":
