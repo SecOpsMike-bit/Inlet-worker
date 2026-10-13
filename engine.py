@@ -325,6 +325,9 @@ def pull_company_diagnostic(company, workday_cap=120):
         return [], diagnostic
 
     if platform == "successfactors":
+        if not company.get("board_url"):
+            diagnostic["status"] = "missing_board_url"
+            return [], diagnostic
         try:
             jobs = fetch_successfactors(company.get("board_url"))
             diagnostic["status"] = "ok" if jobs else "empty_feed"
