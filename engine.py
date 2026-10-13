@@ -302,7 +302,7 @@ def pull_company(company, known=None):
         return []
 
 
-def pull_company_diagnostic(company):
+def pull_company_diagnostic(company, workday_cap=120):
     """Fetch a company once and report whether a zero result is trustworthy.
 
     Returns (jobs, diagnostic). A zero-job result from an unsupported provider,
@@ -323,7 +323,7 @@ def pull_company_diagnostic(company):
     if "workday" in company:
         w = company["workday"]
         try:
-            jobs = [j for j in fetch_workday(w["tenant"], w["pod"], w["site"]) if j]
+            jobs = [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], cap=workday_cap) if j]
             # Workday's existing fetcher handles request errors internally.
             # Zero results could therefore mean either an empty feed or an error.
             diagnostic["status"] = "ok" if jobs else "empty_or_feed_error"
