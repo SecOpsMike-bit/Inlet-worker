@@ -84,7 +84,7 @@ def run(limit=40, source="directory", output=None):
         cyber_title_candidates = []
 
         for cd in companies:
-            jobs, feed = eng.pull_company_diagnostic(cd)
+            jobs, feed = eng.pull_company_diagnostic(cd, workday_cap=80)
             feed_status_counts[feed["status"]] += 1
             company_stats = {"company": cd.get("name"), "raw_jobs": len(jobs),
                              "feed": feed,
