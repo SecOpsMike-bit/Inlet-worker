@@ -296,6 +296,8 @@ def pull_company(company, known=None):
             w = company["workday"]
             return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], known=known) if j]
         platform = company.get("platform")
+        if platform in {"icims", "adp"}:
+            return []  # explicitly unsupported; never fall back to an unrelated slug
         if platform == "shopify":
             return [j for j in fetch_shopify() if j]
         if platform == "dayforce":
@@ -325,6 +327,11 @@ def pull_company_diagnostic(company, workday_cap=120):
         platform = "workday"
     diagnostic = {"company": name, "platform": platform, "status": "unknown",
                   "attempts": []}
+
+    if platform in {"icims", "adp"}:
+        diagnostic["status"] = "unsupported_platform"
+        diagnostic["board_url"] = company.get("board_url", "")
+        return [], diagnostic
 
     if platform == "shopify":
         try:
