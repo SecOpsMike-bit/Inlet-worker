@@ -191,7 +191,7 @@ def _experience_score(text, profile):
 
 def _onsite_frequency_penalty(text):
     blob = _norm(text)
-    if re.search(r"(?:4|four)\\s+days?\\s+(?:per|a)\\s+week", blob):
+    if re.search(r"(?:4|four)\s+days?\s+(?:per|a)\s+week", blob):
         return 45, "hybrid_4_days_week"
     if re.search(r"(?:3|three)\s+days?\s+(?:per|a)\s+week", blob):
         return 35, "hybrid_3_days_week"
