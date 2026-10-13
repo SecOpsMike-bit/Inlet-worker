@@ -24,7 +24,8 @@ DIRECTORY = [
 
     # Tier 3 - logistics / supply chain / retail (the ops-background edge)
     {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis"},
-    {"name": "Descartes",          "tier": 3, "slug": "descartes", "platform": "successfactors"},  # jobs.descartes.com
+    {"name": "Descartes",          "tier": 3, "slug": "descartes", "platform": "successfactors",
+     "board_url": "https://jobs.descartes.com/go/View-All-Jobs/2574817/"},  # verified official employer board
     {"name": "Shopify",            "tier": 3, "slug": "shopify"},
     {"name": "Take-Two",           "tier": 3, "slug": "taketwo", "platform": "greenhouse"},    # verified Toronto security ops posting
 
