@@ -16,6 +16,7 @@ import urllib.request
 import urllib.error
 
 from successfactors_feed import fetch_successfactors
+from dayforce_feed import fetch_dayforce
 
 # ============================================================ FIELDS
 
@@ -294,6 +295,8 @@ def pull_company(company, known=None):
             w = company["workday"]
             return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], known=known) if j]
         platform = company.get("platform")
+        if platform == "dayforce":
+            return [j for j in fetch_dayforce(company.get("slug")) if j]
         if platform == "successfactors":
             return [j for j in fetch_successfactors(company.get("board_url")) if j]
         if platform == "smartrecruiters":
@@ -321,8 +324,24 @@ def pull_company_diagnostic(company, workday_cap=120):
                   "attempts": []}
 
     if platform == "dayforce":
-        diagnostic["status"] = "unsupported_platform"
-        return [], diagnostic
+        if not company.get("slug"):
+            diagnostic["status"] = "missing_slug"
+            return [], diagnostic
+        try:
+            jobs = fetch_dayforce(company["slug"])
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except urllib.error.HTTPError as exc:
+            diagnostic["status"] = (
+                "access_blocked" if exc.code in (401, 403) else "fetch_error"
+            )
+            diagnostic["error"] = type(exc).__name__
+            diagnostic["http_status"] = exc.code
+            return [], diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            return [], diagnostic
 
     if platform == "successfactors":
         if not company.get("board_url"):
