@@ -42,6 +42,8 @@ jobs:
               "Shopify Ashby lowercase": "https://api.ashbyhq.com/posting-api/job-board/shopify?includeCompensation=true",
               "Shopify Ashby capitalized": "https://api.ashbyhq.com/posting-api/job-board/Shopify?includeCompensation=true",
               "Shopify careers": "https://www.shopify.com/careers",
+              "Kinaxis public Jibe API": "https://join.kinaxis.com/api/jobs?page=1",
+              "Kinaxis public Jibe API page 2": "https://join.kinaxis.com/api/jobs?page=2",
               "Kinaxis jobs": "https://join.kinaxis.com/jobs",
               "Kinaxis sample": "https://join.kinaxis.com/jobs/35467?lang=en-us",
               "Field Effect careers": "https://fieldeffect.com/careers",
@@ -63,6 +65,7 @@ jobs:
                   if data.lstrip().startswith(("{", "[")):
                       try:
                           parsed = json.loads(data)
+                          result["json_keys"] = list(parsed)[:30] if isinstance(parsed, dict) else []
                           jobs = parsed.get("jobs", []) if isinstance(parsed, dict) else parsed
                           result["jobs_count"] = len(jobs) if isinstance(jobs, list) else None
                           result["sample_jobs"] = [
