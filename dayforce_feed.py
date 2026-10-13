@@ -22,7 +22,7 @@ COUNTRIES = {
 
 
 def _clean(value):
-    return re.sub(r"\\s+", " ", html.unescape(re.sub(
+    return re.sub(r"\s+", " ", html.unescape(re.sub(
         r"<[^>]+>", " ", str(value or "")
     ))).strip()
 
