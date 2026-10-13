@@ -26,7 +26,7 @@ DIRECTORY = [
     {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis"},
     {"name": "Descartes",          "tier": 3, "slug": "descartes", "platform": "successfactors",
      "board_url": "https://jobs.descartes.com/go/View-All-Jobs/2574817/"},  # verified official employer board
-    {"name": "Shopify",            "tier": 3, "slug": "shopify"},
+    {"name": "Shopify",            "tier": 3, "platform": "shopify", "slug": "shopify"},  # official first-party careers HTML
     {"name": "Take-Two",           "tier": 3, "slug": "taketwo", "platform": "greenhouse"},    # verified Toronto security ops posting
 
 ]
