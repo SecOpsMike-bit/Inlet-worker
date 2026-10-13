@@ -27,13 +27,30 @@ class FeedDiagnosticsTests(unittest.TestCase):
         self.assertGreaterEqual(score, 55)
 
     def test_explicit_unsupported_provider_is_not_no_vacancies(self):
-        for provider in ("dayforce", "successfactors"):
-            with self.subTest(provider=provider):
-                jobs, diag = engine.pull_company_diagnostic(
-                    {"name": "Test Employer", "platform": provider, "slug": "test"}
-                )
-                self.assertEqual(jobs, [])
-                self.assertEqual(diag["status"], "unsupported_platform")
+        jobs, diag = engine.pull_company_diagnostic(
+            {"name": "Test Employer", "platform": "dayforce", "slug": "test"}
+        )
+        self.assertEqual(jobs, [])
+        self.assertEqual(diag["status"], "unsupported_platform")
+
+    def test_successfactors_missing_url_is_not_no_vacancies(self):
+        jobs, diag = engine.pull_company_diagnostic(
+            {"name": "Test Employer", "platform": "successfactors", "slug": "test"}
+        )
+        self.assertEqual(jobs, [])
+        self.assertEqual(diag["status"], "missing_board_url")
+
+    def test_successfactors_feed_reports_actual_results(self):
+        sample = [{"title": "Security Analyst", "location": "Toronto, ON",
+                   "url": "https://jobs.descartes.com/job/Toronto-Test/12345/",
+                   "text": "SOC SIEM EDR incident response", "posted": ""}]
+        with patch.object(engine, "fetch_successfactors", return_value=sample):
+            jobs, diag = engine.pull_company_diagnostic({
+                "name": "Descartes", "platform": "successfactors",
+                "board_url": "https://jobs.descartes.com/go/View-All-Jobs/2574817/"
+            })
+        self.assertEqual(jobs, sample)
+        self.assertEqual(diag["status"], "ok")
 
     def test_directory_preserves_known_platform(self):
         company = _directory_company_dict(
