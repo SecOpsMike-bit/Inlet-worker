@@ -31,7 +31,7 @@ def _company_dict(c):
 def _directory_company_dict(c, index):
     out = dict(c)
     out["id"] = -(index + 1)
-    out["platform"] = "workday" if "workday" in out else "auto"
+    out["platform"] = "workday" if "workday" in out else out.get("platform", "auto")
     return out
 
 
@@ -80,12 +80,15 @@ def run(limit=40, source="directory", output=None):
         v3_kept = 0
         v3_recommendations = []
         per_company = []
+        feed_status_counts = Counter()
         v3_rejection_reasons = Counter()
         cyber_title_candidates = []
 
         for cd in companies:
-            jobs = eng.pull_company(cd) or []
+            jobs, feed = eng.pull_company_diagnostic(cd)
+            feed_status_counts[feed["status"]] += 1
             company_stats = {"company": cd.get("name"), "raw_jobs": len(jobs),
+                             "feed": feed,
                              "v2_kept": 0, "v3_kept": 0, "cyber_title_candidates": 0}
             per_company.append(company_stats)
             if not jobs:
@@ -154,6 +157,7 @@ def run(limit=40, source="directory", output=None):
             "v2_kept": v2_kept,
             "v3_kept": v3_kept,
             "per_company": per_company,
+            "feed_status_counts": dict(feed_status_counts.most_common()),
             "v3_rejection_reasons": dict(v3_rejection_reasons.most_common()),
             "cyber_title_candidates_count": len(cyber_title_candidates),
             "cyber_title_candidates": cyber_title_candidates,
@@ -171,7 +175,7 @@ def run(limit=40, source="directory", output=None):
             "source", "companies_available", "companies_with_jobs",
             "raw_jobs_evaluated", "v2_kept", "v3_kept",
             "cyber_title_candidates_count", "disagreements",
-            "per_company", "v3_rejection_reasons",
+            "per_company", "feed_status_counts", "v3_rejection_reasons",
         )}
         summary["cyber_title_candidates_preview"] = cyber_title_candidates[:35]
         summary["v3_recommendations"] = report["v3_recommendations"]
