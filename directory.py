@@ -24,8 +24,8 @@ DIRECTORY = [
     {"name": "TELUS Digital Solutions", "tier": 2, "slug": "telus-digital", "platform": "ashby"},  # employer-linked Digital Solutions board
 
     # Tier 3 - logistics / supply chain / retail (the ops-background edge)
-    {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis", "platform": "icims",
-     "board_url": "https://join.kinaxis.com/jobs"},  # verified iCIMS/Jibe portal; API integration pending
+    {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis", "platform": "jibe",
+     "board_url": "https://join.kinaxis.com/jobs"},  # verified public /api/jobs feed
     {"name": "Descartes",          "tier": 3, "slug": "descartes", "platform": "successfactors",
      "board_url": "https://jobs.descartes.com/go/View-All-Jobs/2574817/"},  # verified official employer board
     {"name": "Shopify",            "tier": 3, "platform": "shopify", "slug": "shopify"},  # official first-party careers HTML
