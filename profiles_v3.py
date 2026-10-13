@@ -28,6 +28,7 @@ CYBERSECURITY_BETA_PROFILE = {
     "conditional_titles": [
         "security analyst",
         "security specialist",
+        "security administrator",  # include only with genuine SOC evidence
         "information security analyst",
         "threat analyst",
         "security consultant",
