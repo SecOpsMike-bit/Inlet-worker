@@ -129,4 +129,37 @@ jobs:
                   "status": "error", "error": type(exc).__name__,
                   "http_status": getattr(exc, "code", None), "message": str(exc)[:300]
               }))
+          # Exercise the integrated adapters and candidate matching end to end.
+          from dayforce_feed import fetch_dayforce
+          from engine import fetch_ashby
+          from match_v3 import evaluate
+          from profiles_v3 import CYBERSECURITY_BETA_PROFILE
+          for company, jobs in (
+              ("eSentire", fetch_dayforce("esentire")),
+              ("TELUS Digital Solutions", fetch_ashby("telus-digital")),
+          ):
+              matches = []
+              candidates = []
+              for job in jobs:
+                  result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+                  if result["recommendation"] != "skip":
+                      matches.append({
+                          "title": job["title"], "location": job["location"],
+                          "score": result["overall_score"],
+                          "recommendation": result["recommendation"],
+                          "url": job["url"], "warnings": result.get("warnings", [])
+                      })
+                  if any(term in job["title"].lower() for term in
+                         ("security", "soc", "incident", "cyber", "support center")):
+                      candidates.append({
+                          "title": job["title"], "location": job["location"],
+                          "v3": result["recommendation"],
+                          "reason": result.get("reason"),
+                          "warnings": result.get("warnings", []),
+                      })
+              print("MATCHING", json.dumps({
+                  "company": company, "jobs": len(jobs),
+                  "v3_matches": len(matches), "matches": matches[:15],
+                  "cyber_title_candidates": candidates[:30]
+              }, default=str)[:18000])
           PY
