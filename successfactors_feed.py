@@ -25,7 +25,7 @@ class _JobLinks(HTMLParser):
         href = dict(attrs).get("href", "")
         parsed = urlsplit(urljoin("https://" + self.hostname, href))
         if parsed.hostname == self.hostname and re.fullmatch(
-            r"/job/[^/]+/\\d+/?", parsed.path
+            r"/job/[^/]+/\d+/?", parsed.path
         ):
             self._href = parsed._replace(query="", fragment="").geturl()
             self._label = []
@@ -37,7 +37,7 @@ class _JobLinks(HTMLParser):
     def handle_endtag(self, tag):
         if tag == "a" and self._href:
             title = html.unescape(" ".join(self._label)).strip()
-            title = re.sub(r"\\s+", " ", title)
+            title = re.sub(r"\s+", " ", title)
             if title:
                 self.links.append((title, self._href))
             self._href = None
@@ -50,7 +50,7 @@ class _Text(HTMLParser):
         self.parts = []
 
     def handle_data(self, data):
-        clean = re.sub(r"\\s+", " ", html.unescape(data)).strip()
+        clean = re.sub(r"\s+", " ", html.unescape(data)).strip()
         if clean:
             self.parts.append(clean)
 
@@ -77,7 +77,7 @@ def parse_job_detail(page):
     """Extract location from the actual posting; never infer it from prose."""
     parser = _Text()
     parser.feed(page)
-    text = "\\n".join(parser.parts)
+    text = "\n".join(parser.parts)
     lines = parser.parts
     location = ""
     for index, line in enumerate(lines):
