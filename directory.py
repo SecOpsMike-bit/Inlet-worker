@@ -20,7 +20,7 @@ DIRECTORY = [
     {"name": "RBC",                "tier": 2, "workday": {"tenant": "rbc", "pod": "wd3", "site": "RBCGLOBAL1"}},          # confirmed
     {"name": "Finastra",           "tier": 2, "workday": {"tenant": "finastra", "pod": "wd3", "site": "FINC"}},              # verified employer Workday
     {"name": "CDW",                "tier": 2, "workday": {"tenant": "cdw", "pod": "wd5", "site": "careers"}},                 # verified employer Workday
-    {"name": "TELUS International", "tier": 2, "workday": {"tenant": "telusinternational", "pod": "wd3", "site": "External"}},  # confirmed
+    {"name": "TELUS Digital Solutions", "tier": 2, "slug": "telus-digital", "platform": "ashby"},  # employer-linked Digital Solutions board
 
     # Tier 3 - logistics / supply chain / retail (the ops-background edge)
     {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis"},
