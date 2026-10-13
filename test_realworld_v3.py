@@ -30,7 +30,7 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
     def test_security_administrator_requires_real_soc_duties(self):
         """Posh-style operational security roles are eligible; admin-only ones are not."""
         soc = self.job(
-            "Security Administrator / SOC Analyst",
+            "Security Administrator",
             "Remote - Canada",
             "Security operations center, SIEM, EDR, triage alerts, investigate "
             "security incidents, incident response, threat hunting, "
