@@ -214,10 +214,15 @@ def discover(slug):
             continue
     return None, []
 
-# search terms so a Workday board returns roles across all fields, not just security
-WORKDAY_TERMS = ["security", "software engineer", "developer", "data", "analyst",
-                 "product manager", "project manager", "finance", "accounting",
-                 "marketing", "sales", "operations"]
+# Prioritize specific SOC/MDR queries before broad keywords. Workday commonly
+# limits search results to the first page; broad "security" alone can miss
+# relevant junior analyst positions buried under unrelated listings.
+WORKDAY_TERMS = [
+    "soc analyst", "security operations", "incident response", "cybersecurity",
+    "threat analyst", "managed detection", "mdr", "security analyst", "security",
+    "software engineer", "developer", "data", "analyst", "product manager",
+    "project manager", "finance", "accounting", "marketing", "sales", "operations",
+]
 
 def fetch_workday(tenant, pod, site, per_term=20, cap=120, known=None):
     base = f"https://{tenant}.{pod}.myworkdayjobs.com"
@@ -295,6 +300,75 @@ def pull_company(company, known=None):
         return jobs
     except Exception:
         return []
+
+
+def pull_company_diagnostic(company):
+    """Fetch a company once and report whether a zero result is trustworthy.
+
+    Returns (jobs, diagnostic). A zero-job result from an unsupported provider,
+    failed HTTP request or unsuccessful auto-discovery must NEVER be interpreted
+    as proof the employer has no open positions.
+    """
+    name = company.get("name", "Unknown")
+    platform = company.get("platform", "auto")
+    if "workday" in company:
+        platform = "workday"
+    diagnostic = {"company": name, "platform": platform, "status": "unknown",
+                  "attempts": []}
+
+    if platform in ("dayforce", "successfactors"):
+        diagnostic["status"] = "unsupported_platform"
+        return [], diagnostic
+
+    if "workday" in company:
+        w = company["workday"]
+        try:
+            jobs = [j for j in fetch_workday(w["tenant"], w["pod"], w["site"]) if j]
+            # Workday's existing fetcher handles request errors internally.
+            # Zero results could therefore mean either an empty feed or an error.
+            diagnostic["status"] = "ok" if jobs else "empty_or_feed_error"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            return [], diagnostic
+
+    slug = company.get("slug", "")
+    if platform in _FETCHERS or platform == "smartrecruiters":
+        fetch = fetch_smartrecruiters if platform == "smartrecruiters" else _FETCHERS[platform]
+        try:
+            jobs = [j for j in fetch(slug) if j]
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
+
+    if not slug:
+        diagnostic["status"] = "missing_slug"
+        return [], diagnostic
+
+    for provider, fetch in _AUTO:
+        try:
+            jobs = [j for j in fetch(slug) if j]
+            diagnostic["attempts"].append({"platform": provider,
+                                            "status": "ok" if jobs else "empty_feed"})
+            if jobs:
+                diagnostic["platform"] = provider
+                diagnostic["status"] = "ok"
+                return jobs, diagnostic
+        except Exception as exc:
+            attempt = {"platform": provider, "status": "fetch_error",
+                       "error": type(exc).__name__}
+            if isinstance(exc, urllib.error.HTTPError):
+                attempt["http_status"] = exc.code
+            diagnostic["attempts"].append(attempt)
+    diagnostic["status"] = "unresolved_feed"
+    return [], diagnostic
+
 
 # ============================================================ CLASSIFY + SCORE
 
