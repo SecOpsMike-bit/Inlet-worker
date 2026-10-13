@@ -92,5 +92,23 @@ jobs:
                   result["error"] = type(exc).__name__
                   if isinstance(exc, urllib.error.HTTPError):
                       result["http"] = exc.code
+              if name == "Shopify careers" and result.get("http") == 200:
+                  links = re.findall(r'<a[^>]*href=["\\\']([^"\\\']*?/careers/[^"\\\']+)["\\\'][^>]*>(.*?)</a>', data, re.I | re.S)
+                  result["job_anchor_samples"] = [
+                      {"href": h, "text": re.sub(r"<[^>]+>", " ", t).strip()[:140]}
+                      for h, t in links[:8]
+                  ]
+                  result["cyber_snippets"] = [
+                      re.sub(r"\\s+", " ", data[max(0,m.start()-180):m.start()+320])[:500]
+                      for m in list(re.finditer(r"security operations|security analyst|incident response|cybersecurity", data, re.I))[:5]
+                  ]
+              if name.startswith("Kinaxis") and result.get("http") == 200:
+                  result["icims_snippets"] = [
+                      re.sub(r"\\s+", " ", data[max(0,m.start()-250):m.start()+350])[:600]
+                      for m in list(re.finditer(r"icims|jobId|jobs/35467|jobId", data, re.I))[:7]
+                  ]
+                  result["kinaxis_json_keys"] = list(dict.fromkeys(
+                      re.findall(r'["\\\']([a-zA-Z][a-zA-Z_]+)["\\\']\\s*:', data[:80000])
+                  ))[:35]
               print(json.dumps(result))
           PY
