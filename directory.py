@@ -8,6 +8,9 @@ DIRECTORY = [
     {"name": "Arctic Wolf",        "tier": 1, "workday": {"tenant": "arcticwolf", "pod": "wd1", "site": "External"}},        # confirmed
     {"name": "Optiv",              "tier": 1, "workday": {"tenant": "optiv", "pod": "wd5", "site": "Optiv_Careers"}},        # confirmed
     {"name": "CrowdStrike",        "tier": 1, "workday": {"tenant": "crowdstrike", "pod": "wd5", "site": "crowdstrikecareers"}}, # verified employer Workday
+    {"name": "AlphaSense",         "tier": 1, "slug": "alphasense", "platform": "greenhouse"}, # verified active Canada SOC role
+    {"name": "Posh AI",            "tier": 1, "slug": "posh-ai", "platform": "ashby"},          # verified Security Administrator / SOC role
+
     # Still to resolve (find each careers URL, then convert to a workday{} entry or correct slug):
     {"name": "eSentire",           "tier": 1, "slug": "esentire", "platform": "dayforce"},  # employer careers link
     {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect"},
@@ -23,4 +26,6 @@ DIRECTORY = [
     {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis"},
     {"name": "Descartes",          "tier": 3, "slug": "descartes", "platform": "successfactors"},  # jobs.descartes.com
     {"name": "Shopify",            "tier": 3, "slug": "shopify"},
+    {"name": "Take-Two",           "tier": 3, "slug": "taketwo", "platform": "greenhouse"},    # verified Toronto security ops posting
+
 ]
