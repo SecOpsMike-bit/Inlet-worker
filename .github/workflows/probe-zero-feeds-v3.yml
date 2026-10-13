@@ -1,0 +1,39 @@
+name: V3 employer feed probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3-profile-matching]
+    paths:
+      - '.github/workflows/probe-zero-feeds-v3.yml'
+      - 'successfactors_feed.py'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Probe Descartes official SuccessFactors board
+        run: |
+          python - <<'PY'
+          import json
+          from successfactors_feed import fetch_successfactors
+          url = "https://jobs.descartes.com/go/View-All-Jobs/2574817/"
+          jobs = fetch_successfactors(url, cap=35)
+          print(json.dumps({
+              "source": "Descartes SuccessFactors",
+              "jobs": len(jobs),
+              "canada_location_jobs": sum(
+                  1 for j in jobs if ", CA," in j["location"] or "Canada" in j["location"]
+              ),
+              "samples": [
+                  {"title": j["title"], "location": j["location"], "url": j["url"]}
+                  for j in jobs[:8]
+              ]
+          }, indent=2))
+          assert jobs, "Employer board produced no verified jobs"
+          PY
