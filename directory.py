@@ -12,7 +12,7 @@ DIRECTORY = [
     {"name": "Posh AI",            "tier": 1, "slug": "posh-ai", "platform": "ashby"},          # verified Security Administrator / SOC role
 
     # Still to resolve (find each careers URL, then convert to a workday{} entry or correct slug):
-    {"name": "eSentire",           "tier": 1, "slug": "esentire", "platform": "dayforce"},  # employer careers link
+    {"name": "eSentire",           "tier": 1, "slug": "esentire", "platform": "dayforce"},  # verified official public JobFeeds API
     {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect"},
     {"name": "GoSecure",           "tier": 1, "slug": "gosecure"},
 
