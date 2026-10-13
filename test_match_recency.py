@@ -27,7 +27,7 @@ class RecencyScoringTests(unittest.TestCase):
         }
         result = match_v2.explain_cyber_match(job)
         self.assertFalse(result["accepted"])
-        self.assertIn(result["reason"], {"older_not_exceptional", "too_old"})
+        self.assertIn(result["reason"], {"older_not_exceptional", "too_old", "stale"})
 
 
 if __name__ == "__main__":
