@@ -1,0 +1,96 @@
+name: V3 unresolved employer source discovery
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3-profile-matching]
+    paths:
+      - '.github/workflows/probe-unresolved-v3.yml'
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Inspect bounded public employer career feeds
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          import urllib.error
+          import urllib.request
+          from html.parser import HTMLParser
+
+          class Anchors(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.links = []
+              def handle_starttag(self, tag, attrs):
+                  if tag == "a":
+                      href = dict(attrs).get("href", "")
+                      if any(s in href.lower() for s in (
+                          "job", "career", "apply", "greenhouse", "lever", "ashby",
+                          "recruit", "join", "talent", "workday", "icims", "smartrecruit",
+                      )):
+                          self.links.append(href)
+
+          targets = {
+              "Shopify Ashby lowercase": "https://api.ashbyhq.com/posting-api/job-board/shopify?includeCompensation=true",
+              "Shopify Ashby capitalized": "https://api.ashbyhq.com/posting-api/job-board/Shopify?includeCompensation=true",
+              "Shopify careers": "https://www.shopify.com/careers",
+              "Kinaxis jobs": "https://join.kinaxis.com/jobs",
+              "Kinaxis sample": "https://join.kinaxis.com/jobs/35467?lang=en-us",
+              "Field Effect careers": "https://fieldeffect.com/careers",
+              "GoSecure careers": "https://legacy.gosecure.ai/careers/",
+              "GoSecure current": "https://gosecure.ai/careers/",
+          }
+          for name, url in targets.items():
+              result = {"source": name}
+              try:
+                  request = urllib.request.Request(url, headers={
+                      "User-Agent": "Mozilla/5.0 (compatible; GetInletsV3FeedAudit/1.0)",
+                      "Accept": "application/json,text/html;q=0.9,*/*;q=0.8",
+                  })
+                  with urllib.request.urlopen(request, timeout=12) as response:
+                      raw = response.read(350000)
+                      data = raw.decode("utf-8", "replace")
+                      result.update({"http": response.status, "url": response.url,
+                                     "bytes_read": len(raw)})
+                  if data.lstrip().startswith(("{", "[")):
+                      try:
+                          parsed = json.loads(data)
+                          jobs = parsed.get("jobs", []) if isinstance(parsed, dict) else parsed
+                          result["jobs_count"] = len(jobs) if isinstance(jobs, list) else None
+                          result["sample_jobs"] = [
+                              {"title": j.get("title"), "location": j.get("location"),
+                               "url": j.get("jobUrl") or j.get("applyUrl")}
+                              for j in jobs[:3] if isinstance(j, dict)
+                          ] if isinstance(jobs, list) else []
+                      except ValueError:
+                          result["json_truncated"] = True
+                  else:
+                      parser = Anchors()
+                      parser.feed(data)
+                      result["links"] = list(dict.fromkeys(parser.links))[:18]
+                      result["html_signals"] = {
+                          key: bool(re.search(pattern, data, re.I))
+                          for key, pattern in {
+                              "ashby": r"ashby(?:_jid|hq|\.com)",
+                              "phenom": r"phenom|ph-?app",
+                              "icims": r"icims",
+                              "jobvite": r"jobvite",
+                              "greenhouse": r"greenhouse",
+                              "workday": r"myworkdayjobs",
+                              "json_ld_jobposting": r"application/ld\\+json",
+                          }.items()
+                      }
+              except Exception as exc:
+                  result["error"] = type(exc).__name__
+                  if isinstance(exc, urllib.error.HTTPError):
+                      result["http"] = exc.code
+              print(json.dumps(result))
+          PY
