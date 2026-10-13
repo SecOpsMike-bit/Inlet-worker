@@ -22,11 +22,23 @@ jobs:
           python - <<'PY'
           import json
           from successfactors_feed import fetch_successfactors
+          from match_v3 import evaluate
+          from profiles_v3 import CYBERSECURITY_BETA_PROFILE
           url = "https://jobs.descartes.com/go/View-All-Jobs/2574817/"
           jobs = fetch_successfactors(url, cap=35)
+          matches = [
+              {"title": job["title"], "location": job["location"],
+               "recommendation": result["recommendation"], "score": result["overall_score"],
+               "url": job["url"]}
+              for job in jobs
+              for result in [evaluate(job, CYBERSECURITY_BETA_PROFILE)]
+              if result["recommendation"] != "skip"
+          ]
           print(json.dumps({
               "source": "Descartes SuccessFactors",
               "jobs": len(jobs),
+              "v3_cyber_matches": len(matches),
+              "v3_cyber_recommendations": matches,
               "canada_location_jobs": sum(
                   1 for j in jobs if ", CA," in j["location"] or "Canada" in j["location"]
               ),
