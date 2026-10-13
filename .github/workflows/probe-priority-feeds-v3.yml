@@ -54,6 +54,32 @@ jobs:
                   "http_status": getattr(exc, "code", None), "message": str(exc)[:300]
               }))
 
+          # Check only employer-published, anonymous read-only alternatives.
+          for label, url in (
+              ("ESENTIRE_LEGACY_BOARD",
+               "https://can262.dayforcehcm.com/CandidatePortal/en-US/esentire/Site/CANDIDATEPORTAL"),
+              ("ESENTIRE_PUBLIC_BOARD",
+               "https://jobs.dayforcehcm.com/esentire/CANDIDATEPORTAL"),
+              ("ESENTIRE_PUBLIC_FEED",
+               "https://www.dayforcehcm.com/api/esentire/V1/JobFeeds"),
+          ):
+              try:
+                  req = urllib.request.Request(url, headers={"User-Agent": "GetInlets/1.0"})
+                  with urllib.request.urlopen(req, timeout=12) as r:
+                      body = r.read(500000).decode("utf-8", errors="replace")
+                      print(label, json.dumps({
+                          "status": "ok", "url": r.url,
+                          "content_type": r.headers.get("Content-Type"),
+                          "chars": len(body), "job_term_count": body.lower().count("job"),
+                          "sample": body[:150].replace("\\n", " ")
+                      }))
+              except Exception as exc:
+                  print(label, json.dumps({
+                      "status": "error", "error": type(exc).__name__,
+                      "http_status": getattr(exc, "code", None),
+                      "message": str(exc)[:160]
+                  }))
+
           url = "https://api.ashbyhq.com/posting-api/job-board/telus-digital?includeCompensation=true"
           try:
               req = urllib.request.Request(url, headers={"User-Agent": "GetInlets/1.0"})
