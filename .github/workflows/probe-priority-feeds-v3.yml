@@ -1,4 +1,4 @@
-name: V3 priority feed probe
+name: V3 priority employer feed smoke test
 
 on:
   workflow_dispatch:
@@ -6,6 +6,13 @@ on:
     branches: [v3-profile-matching]
     paths:
       - '.github/workflows/probe-priority-feeds-v3.yml'
+      - 'dayforce_feed.py'
+      - 'engine.py'
+      - 'directory.py'
+
+concurrency:
+  group: v3-priority-feeds-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   probe:
@@ -16,160 +23,50 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Probe eSentire public Dayforce and TELUS Digital Ashby
+      - name: Verify official employer feeds and V3 decisions
         run: |
           python - <<'PY'
           import json
-          import urllib.request
-          import urllib.error
-
-          def post(url, payload):
-              data = json.dumps(payload).encode()
-              req = urllib.request.Request(url, data=data, method="POST", headers={
-                  "Content-Type": "application/json", "Accept": "application/json",
-                  "User-Agent": "Mozilla/5.0", "Origin": "https://jobs.dayforcehcm.com"
-              })
-              with urllib.request.urlopen(req, timeout=20) as r:
-                  return json.load(r)
-
-          url = "https://jobs.dayforcehcm.com/api/geo/esentire/jobposting/search"
-          payload = {
-              "clientNamespace": "esentire",
-              "jobBoardCode": "CANDIDATEPORTAL",
-              "cultureCode": "en-US",
-              "distanceUnit": "km",
-              "paginationStart": 0
-          }
-          try:
-              data = post(url, payload)
-              rows = data.get("jobPostings", [])
-              print("DAYFORCE", json.dumps({
-                  "status": "ok", "keys": list(data.keys()),
-                  "maxCount": data.get("maxCount"), "rows": len(rows),
-                  "first_row": rows[0] if rows else None,
-              }, default=str)[:9000])
-          except Exception as exc:
-              print("DAYFORCE", json.dumps({
-                  "status": "error", "error": type(exc).__name__,
-                  "http_status": getattr(exc, "code", None), "message": str(exc)[:300]
-              }))
-
-          # Check only employer-published, anonymous read-only alternatives.
-          for label, url in (
-              ("ESENTIRE_LEGACY_BOARD",
-               "https://can262.dayforcehcm.com/CandidatePortal/en-US/esentire/Site/CANDIDATEPORTAL"),
-              ("ESENTIRE_PUBLIC_BOARD",
-               "https://jobs.dayforcehcm.com/esentire/CANDIDATEPORTAL"),
-              ("ESENTIRE_PUBLIC_FEED",
-               "https://www.dayforcehcm.com/api/esentire/V1/JobFeeds"),
-          ):
-              try:
-                  req = urllib.request.Request(url, headers={"User-Agent": "GetInlets/1.0"})
-                  with urllib.request.urlopen(req, timeout=12) as r:
-                      body = r.read(500000).decode("utf-8", errors="replace")
-                      print(label, json.dumps({
-                          "status": "ok", "url": r.url,
-                          "content_type": r.headers.get("Content-Type"),
-                          "chars": len(body), "job_term_count": body.lower().count("job"),
-                          "sample": body[:150].replace("\\n", " ")
-                      }))
-              except Exception as exc:
-                  print(label, json.dumps({
-                      "status": "error", "error": type(exc).__name__,
-                      "http_status": getattr(exc, "code", None),
-                      "message": str(exc)[:160]
-                  }))
-
-          # Official anonymous Dayforce JobFeeds API (GET, not blocked geo POST).
-          url = "https://www.dayforcehcm.com/api/esentire/V1/JobFeeds"
-          try:
-              req = urllib.request.Request(url, headers={"User-Agent": "GetInlets/1.0"})
-              with urllib.request.urlopen(req, timeout=20) as r:
-                  rows = json.load(r)
-              print("ESENTIRE_JOBFEEDS", json.dumps({
-                  "rows": len(rows), "first_row_keys": list(rows[0].keys()) if rows else [],
-                  "security_role_details": [
-                      {"title": j.get("Title"), "country": j.get("Country"),
-                       "city": j.get("City"), "state": j.get("State"),
-                       "virtual": j.get("IsVirtualLocation"),
-                       "desc_sample": str(j.get("Description", ""))[:650]}
-                      for j in rows if any(x in str(j.get("Title", "")).lower()
-                          for x in ("security", "support center", "soc", "cyber"))
-                  ][:20],
-                  "first_row": {
-                      k: str(rows[0].get(k))[:200]
-                      for k in ("Title", "City", "State", "Country", "DatePosted",
-                                "JobDetailsUrl", "ApplyUrl")
-                  } if rows else None,
-                  "canadian_rows": [
-                      {"title": j.get("Title"), "city": j.get("City"),
-                       "state": j.get("State"), "country": j.get("Country"),
-                       "url": j.get("JobDetailsUrl")}
-                      for j in rows if str(j.get("Country", "")).lower() in
-                      ("can", "ca", "canada")
-                  ][:25]
-              }, default=str)[:13000])
-          except Exception as exc:
-              print("ESENTIRE_JOBFEEDS", json.dumps({
-                  "status": "error", "error": type(exc).__name__,
-                  "http_status": getattr(exc, "code", None), "message": str(exc)[:300]
-              }))
-
-          url = "https://api.ashbyhq.com/posting-api/job-board/telus-digital?includeCompensation=true"
-          try:
-              req = urllib.request.Request(url, headers={"User-Agent": "GetInlets/1.0"})
-              with urllib.request.urlopen(req, timeout=20) as r:
-                  data = json.load(r)
-              rows = data.get("jobs", [])
-              print("TELUS_ASHBY", json.dumps({
-                  "status": "ok", "rows": len(rows),
-                  "first_row": {
-                      "title": rows[0].get("title"), "location": rows[0].get("location"),
-                      "jobUrl": rows[0].get("jobUrl")
-                  } if rows else None,
-                  "canadian_rows": [
-                      {"title": j.get("title"), "location": j.get("location")}
-                      for j in rows if any(t in str(j.get("location", "")).lower()
-                          for t in ("canada", "toronto", "vancouver", "ontario",
-                                    "waterloo", "ottawa", "montreal", "calgary"))
-                  ][:20]
-              }))
-          except Exception as exc:
-              print("TELUS_ASHBY", json.dumps({
-                  "status": "error", "error": type(exc).__name__,
-                  "http_status": getattr(exc, "code", None), "message": str(exc)[:300]
-              }))
-          # Exercise the integrated adapters and candidate matching end to end.
-          from dayforce_feed import fetch_dayforce
-          from engine import fetch_ashby
+          from directory import DIRECTORY
+          from engine import pull_company_diagnostic
           from match_v3 import evaluate
           from profiles_v3 import CYBERSECURITY_BETA_PROFILE
-          for company, jobs in (
-              ("eSentire", fetch_dayforce("esentire")),
-              ("TELUS Digital Solutions", fetch_ashby("telus-digital")),
-          ):
-              matches = []
-              candidates = []
+
+          for name in ("eSentire", "TELUS Digital Solutions"):
+              employer = next(c for c in DIRECTORY if c["name"] == name)
+              jobs, diagnostic = pull_company_diagnostic(employer)
+              if diagnostic["status"] != "ok":
+                  raise RuntimeError(
+                      f"{name} feed is not healthy: {diagnostic}"
+                  )
+              assert jobs, f"{name} returned no public job postings"
+              assert all(
+                  j.get("title") and j.get("url", "").startswith("https://")
+                  for j in jobs
+              ), f"{name} returned malformed public job links"
+              recommendations = []
               for job in jobs:
                   result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
                   if result["recommendation"] != "skip":
-                      matches.append({
+                      recommendations.append({
                           "title": job["title"], "location": job["location"],
                           "score": result["overall_score"],
                           "recommendation": result["recommendation"],
-                          "url": job["url"], "warnings": result.get("warnings", [])
-                      })
-                  if any(term in job["title"].lower() for term in
-                         ("security", "soc", "incident", "cyber", "support center")):
-                      candidates.append({
-                          "title": job["title"], "location": job["location"],
-                          "v3": result["recommendation"],
-                          "reason": result.get("reason"),
+                          "url": job["url"],
                           "warnings": result.get("warnings", []),
                       })
-              print("MATCHING", json.dumps({
-                  "company": company, "jobs": len(jobs),
-                  "v3_matches": len(matches), "matches": matches[:15],
-                  "cyber_title_candidates": candidates[:30]
-              }, default=str)[:18000])
+              canadian = sum(
+                  any(t in (j.get("location") or "").lower() for t in (
+                      "canada", "ontario", "toronto", "waterloo",
+                      "vancouver", "ottawa", "montreal", "calgary"
+                  )) for j in jobs
+              )
+              print(json.dumps({
+                  "employer": name, "platform": diagnostic["platform"],
+                  "status": diagnostic["status"],
+                  "unique_postings": len(jobs),
+                  "canadian_location_postings": canadian,
+                  "v3_cyber_matches": len(recommendations),
+                  "v3_recommendations": recommendations[:20],
+              }, indent=2))
           PY
