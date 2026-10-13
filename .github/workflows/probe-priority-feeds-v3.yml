@@ -1,0 +1,79 @@
+name: V3 priority feed probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3-profile-matching]
+    paths:
+      - '.github/workflows/probe-priority-feeds-v3.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Probe eSentire public Dayforce and TELUS Digital Ashby
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+          import urllib.error
+
+          def post(url, payload):
+              data = json.dumps(payload).encode()
+              req = urllib.request.Request(url, data=data, method="POST", headers={
+                  "Content-Type": "application/json", "Accept": "application/json",
+                  "User-Agent": "Mozilla/5.0", "Origin": "https://jobs.dayforcehcm.com"
+              })
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  return json.load(r)
+
+          url = "https://jobs.dayforcehcm.com/api/geo/esentire/jobposting/search"
+          payload = {
+              "clientNamespace": "esentire",
+              "jobBoardCode": "CANDIDATEPORTAL",
+              "cultureCode": "en-US",
+              "distanceUnit": "km",
+              "paginationStart": 0
+          }
+          try:
+              data = post(url, payload)
+              rows = data.get("jobPostings", [])
+              print("DAYFORCE", json.dumps({
+                  "status": "ok", "keys": list(data.keys()),
+                  "maxCount": data.get("maxCount"), "rows": len(rows),
+                  "first_row": rows[0] if rows else None,
+              }, default=str)[:9000])
+          except Exception as exc:
+              print("DAYFORCE", json.dumps({
+                  "status": "error", "error": type(exc).__name__,
+                  "http_status": getattr(exc, "code", None), "message": str(exc)[:300]
+              }))
+
+          url = "https://api.ashbyhq.com/posting-api/job-board/telus-digital?includeCompensation=true"
+          try:
+              req = urllib.request.Request(url, headers={"User-Agent": "GetInlets/1.0"})
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  data = json.load(r)
+              rows = data.get("jobs", [])
+              print("TELUS_ASHBY", json.dumps({
+                  "status": "ok", "rows": len(rows),
+                  "first_row": {
+                      "title": rows[0].get("title"), "location": rows[0].get("location"),
+                      "jobUrl": rows[0].get("jobUrl")
+                  } if rows else None,
+                  "canadian_rows": [
+                      {"title": j.get("title"), "location": j.get("location")}
+                      for j in rows if "canada" in str(j.get("location", "")).lower()
+                  ][:12]
+              }))
+          except Exception as exc:
+              print("TELUS_ASHBY", json.dumps({
+                  "status": "error", "error": type(exc).__name__,
+                  "http_status": getattr(exc, "code", None), "message": str(exc)[:300]
+              }))
+          PY
