@@ -5,13 +5,18 @@ the requirements that mattered to the manual fit decision so future scoring chan
 do not drift back toward generic 'cybersecurity' matching.
 """
 
+import datetime as dt
 import unittest
 
 import match_v2
 
 
+# Matching benchmarks test fit, not the age of a historical posting.
+# Recency behavior is tested separately with fixed reference dates.
+RECENT_POSTED = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+
 class MichaelMatchBenchmarkTests(unittest.TestCase):
-    def job(self, title, location, text, posted="2026-09-09"):
+    def job(self, title, location, text, posted=RECENT_POSTED):
         return {
             "title": title,
             "location": location,
