@@ -9,7 +9,7 @@ DIRECTORY = [
     {"name": "Optiv",              "tier": 1, "workday": {"tenant": "optiv", "pod": "wd5", "site": "Optiv_Careers"}},        # confirmed
     {"name": "CrowdStrike",        "tier": 1, "workday": {"tenant": "crowdstrike", "pod": "wd5", "site": "crowdstrikecareers"}}, # verified employer Workday
     # Still to resolve (find each careers URL, then convert to a workday{} entry or correct slug):
-    {"name": "eSentire",           "tier": 1, "slug": "esentire"},
+    {"name": "eSentire",           "tier": 1, "slug": "esentire", "platform": "dayforce"},  # employer careers link
     {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect"},
     {"name": "GoSecure",           "tier": 1, "slug": "gosecure"},
 
@@ -21,6 +21,6 @@ DIRECTORY = [
 
     # Tier 3 - logistics / supply chain / retail (the ops-background edge)
     {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis"},
-    {"name": "Descartes",          "tier": 3, "slug": "descartes"},
+    {"name": "Descartes",          "tier": 3, "slug": "descartes", "platform": "successfactors"},  # jobs.descartes.com
     {"name": "Shopify",            "tier": 3, "slug": "shopify"},
 ]
