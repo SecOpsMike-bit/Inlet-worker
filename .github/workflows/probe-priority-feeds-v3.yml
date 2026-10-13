@@ -80,6 +80,33 @@ jobs:
                       "message": str(exc)[:160]
                   }))
 
+          # Official anonymous Dayforce JobFeeds API (GET, not blocked geo POST).
+          url = "https://www.dayforcehcm.com/api/esentire/V1/JobFeeds"
+          try:
+              req = urllib.request.Request(url, headers={"User-Agent": "GetInlets/1.0"})
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  rows = json.load(r)
+              print("ESENTIRE_JOBFEEDS", json.dumps({
+                  "rows": len(rows), "first_row_keys": list(rows[0].keys()) if rows else [],
+                  "first_row": {
+                      k: str(rows[0].get(k))[:200]
+                      for k in ("Title", "City", "State", "Country", "DatePosted",
+                                "JobDetailsUrl", "ApplyUrl")
+                  } if rows else None,
+                  "canadian_rows": [
+                      {"title": j.get("Title"), "city": j.get("City"),
+                       "state": j.get("State"), "country": j.get("Country"),
+                       "url": j.get("JobDetailsUrl")}
+                      for j in rows if str(j.get("Country", "")).lower() in
+                      ("can", "ca", "canada")
+                  ][:25]
+              }, default=str)[:13000])
+          except Exception as exc:
+              print("ESENTIRE_JOBFEEDS", json.dumps({
+                  "status": "error", "error": type(exc).__name__,
+                  "http_status": getattr(exc, "code", None), "message": str(exc)[:300]
+              }))
+
           url = "https://api.ashbyhq.com/posting-api/job-board/telus-digital?includeCompensation=true"
           try:
               req = urllib.request.Request(url, headers={"User-Agent": "GetInlets/1.0"})
