@@ -4,14 +4,19 @@ These cases represent manually reviewed roles and deliberate edge cases. V3 shou
 make the same broad Apply / Maybe / Skip decision a careful human reviewer would.
 """
 
+import datetime as dt
 import unittest
 
 from match_v3 import evaluate
 from profiles_v3 import CYBERSECURITY_BETA_PROFILE
 
 
+# Matching benchmarks test fit, not the age of a historical posting.
+# Recency behavior is tested separately with fixed reference dates.
+RECENT_POSTED = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+
 class V3CyberMatchBenchmarkTests(unittest.TestCase):
-    def job(self, title, location, text, posted="2026-09-09"):
+    def job(self, title, location, text, posted=RECENT_POSTED):
         return {
             "title": title,
             "location": location,
