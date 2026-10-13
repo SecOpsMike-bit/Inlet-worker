@@ -88,6 +88,14 @@ jobs:
                   rows = json.load(r)
               print("ESENTIRE_JOBFEEDS", json.dumps({
                   "rows": len(rows), "first_row_keys": list(rows[0].keys()) if rows else [],
+                  "security_role_details": [
+                      {"title": j.get("Title"), "country": j.get("Country"),
+                       "city": j.get("City"), "state": j.get("State"),
+                       "virtual": j.get("IsVirtualLocation"),
+                       "desc_sample": str(j.get("Description", ""))[:650]}
+                      for j in rows if any(x in str(j.get("Title", "")).lower()
+                          for x in ("security", "support center", "soc", "cyber"))
+                  ][:20],
                   "first_row": {
                       k: str(rows[0].get(k))[:200]
                       for k in ("Title", "City", "State", "Country", "DatePosted",
@@ -121,8 +129,10 @@ jobs:
                   } if rows else None,
                   "canadian_rows": [
                       {"title": j.get("title"), "location": j.get("location")}
-                      for j in rows if "canada" in str(j.get("location", "")).lower()
-                  ][:12]
+                      for j in rows if any(t in str(j.get("location", "")).lower()
+                          for t in ("canada", "toronto", "vancouver", "ontario",
+                                    "waterloo", "ottawa", "montreal", "calgary"))
+                  ][:20]
               }))
           except Exception as exc:
               print("TELUS_ASHBY", json.dumps({
