@@ -26,12 +26,36 @@ class FeedDiagnosticsTests(unittest.TestCase):
         self.assertEqual(decision, "keep")
         self.assertGreaterEqual(score, 55)
 
-    def test_explicit_unsupported_provider_is_not_no_vacancies(self):
-        jobs, diag = engine.pull_company_diagnostic(
-            {"name": "Test Employer", "platform": "dayforce", "slug": "test"}
+    def test_dayforce_public_feed_is_supported(self):
+        sample = [{"title": "SOC Analyst", "location": "Waterloo, ON, Canada",
+                   "url": "https://jobs.dayforcehcm.com/en-US/esentire/CANDIDATEPORTAL/jobs/5800",
+                   "text": "SIEM and incident response", "posted": "2026-10-10"}]
+        with patch.object(engine, "fetch_dayforce", return_value=sample):
+            jobs, diag = engine.pull_company_diagnostic({
+                "name": "eSentire", "platform": "dayforce", "slug": "esentire"
+            })
+        self.assertEqual(jobs, sample)
+        self.assertEqual(diag["status"], "ok")
+
+    def test_dayforce_access_denied_is_not_zero_vacancies(self):
+        blocked = urllib.error.HTTPError(
+            "https://www.dayforcehcm.com/api/esentire/V1/JobFeeds",
+            403, "Forbidden", {}, None
         )
+        with patch.object(engine, "fetch_dayforce", side_effect=blocked):
+            jobs, diag = engine.pull_company_diagnostic({
+                "name": "eSentire", "platform": "dayforce", "slug": "esentire"
+            })
         self.assertEqual(jobs, [])
-        self.assertEqual(diag["status"], "unsupported_platform")
+        self.assertEqual(diag["status"], "access_blocked")
+        self.assertEqual(diag["http_status"], 403)
+
+    def test_dayforce_missing_namespace_is_not_empty_feed(self):
+        jobs, diag = engine.pull_company_diagnostic({
+            "name": "Missing", "platform": "dayforce"
+        })
+        self.assertEqual(jobs, [])
+        self.assertEqual(diag["status"], "missing_slug")
 
     def test_successfactors_missing_url_is_not_no_vacancies(self):
         jobs, diag = engine.pull_company_diagnostic(
