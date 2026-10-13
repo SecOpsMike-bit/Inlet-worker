@@ -58,7 +58,7 @@ jobs:
                       "Accept": "application/json,text/html;q=0.9,*/*;q=0.8",
                   })
                   with urllib.request.urlopen(request, timeout=12) as response:
-                      raw = response.read(350000)
+                      raw = response.read(1250000)
                       data = raw.decode("utf-8", "replace")
                       result.update({"http": response.status, "url": response.url,
                                      "bytes_read": len(raw)})
@@ -68,6 +68,14 @@ jobs:
                           result["json_keys"] = list(parsed)[:30] if isinstance(parsed, dict) else []
                           jobs = parsed.get("jobs", []) if isinstance(parsed, dict) else parsed
                           result["jobs_count"] = len(jobs) if isinstance(jobs, list) else None
+                          if isinstance(parsed, dict):
+                              result["totalCount"] = parsed.get("totalCount")
+                          if isinstance(jobs, list) and jobs and isinstance(jobs[0], dict):
+                              result["first_job_keys"] = list(jobs[0])
+                              result["first_job_sample"] = {
+                                  k: str(v)[:130] for k, v in jobs[0].items()
+                                  if k not in {"description", "descriptionHtml", "descriptionPlain"}
+                              }
                           result["sample_jobs"] = [
                               {"title": j.get("title"), "location": j.get("location"),
                                "url": j.get("jobUrl") or j.get("applyUrl")}
