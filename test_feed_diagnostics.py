@@ -52,6 +52,15 @@ class FeedDiagnosticsTests(unittest.TestCase):
         self.assertEqual(jobs, sample)
         self.assertEqual(diag["status"], "ok")
 
+    def test_telus_digital_uses_verified_ashby_not_defunct_workday(self):
+        from directory import DIRECTORY
+        company = next(c for c in DIRECTORY if c["name"] == "TELUS Digital Solutions")
+        self.assertEqual(company["platform"], "ashby")
+        self.assertEqual(company["slug"], "telus-digital")
+        self.assertNotIn("workday", company)
+        resolved = _directory_company_dict(company, 0)
+        self.assertEqual(resolved["platform"], "ashby")
+
     def test_directory_preserves_known_platform(self):
         company = _directory_company_dict(
             {"name": "eSentire", "tier": 1, "slug": "esentire", "platform": "dayforce"}, 0
