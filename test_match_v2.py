@@ -1,10 +1,15 @@
+import datetime as dt
 import unittest
 
 import match_v2
 
 
+# Matching benchmarks test fit, not the age of a historical posting.
+# Recency behavior is tested separately with fixed reference dates.
+RECENT_POSTED = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+
 class MatchV2Tests(unittest.TestCase):
-    def job(self, title, text, location="Toronto, ON", posted="2026-09-10"):
+    def job(self, title, text, location="Toronto, ON", posted=RECENT_POSTED):
         return {"title": title, "text": text, "location": location,
                 "posted": posted, "url": "https://example.com/job"}
 
