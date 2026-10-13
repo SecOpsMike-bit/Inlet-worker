@@ -210,6 +210,14 @@ def _location_score(location, text, profile):
     preferred = [x.lower() for x in profile.get("preferred_locations", [])]
     nearby = [x.lower() for x in profile.get("nearby_ontario_locations", [])]
 
+    # Workday sometimes returns only "2 Locations" instead of the actual
+    # countries. Job-description mentions of Canada are not proof that the
+    # position itself is open to Canadians. Fail closed until the feed supplies
+    # a verified location, rather than treating the description's "remote"
+    # keywords as eligibility evidence.
+    if re.fullmatch(r"\d+\s+locations?", loc.strip()):
+        return 0, "multi_location_unverified"
+
     # "Remote" does not imply worldwide eligibility. Reject explicit foreign-
     # only structured locations before checking the description for Canada.
     if str(profile.get("country", "")).lower() == "canada":
