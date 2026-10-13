@@ -49,6 +49,45 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
         self.assertIn(good["recommendation"], {"strong_apply", "apply", "maybe"})
         self.assertEqual(bad["recommendation"], "skip")
 
+    def test_verified_alphasense_canada_remote_location(self):
+        job = self.job(
+            "Security Operations Analyst II", "Remote - Canada; Vancouver",
+            "Remote within Canada, able to work in the Pacific time zone. "
+            "Monitor SIEM and EDR security alerts, alert triage, incident response, "
+            "cloud audit logs, MITRE ATT&CK, malware, case documentation and escalation. "
+            "2-4 years of SOC experience.",
+            posted=RECENT_POSTED,
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertNotEqual(result["eligibility_status"], "fail", result)
+        self.assertGreater(result["location_score"], 0)
+
+    def test_verified_taketwo_junior_security_operations_engineer(self):
+        job = self.job(
+            "Security Operations Engineer", "Toronto, Ontario, Canada",
+            "Work closely with senior engineers and assist in SOAR playbooks, "
+            "security automation, incident response, SIEM and EDR integrations. "
+            "Foundational Python scripting, MITRE ATT&CK, and 1-3 years of experience.",
+            posted=RECENT_POSTED,
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(result["recommendation"], {"apply", "maybe", "strong_apply"}, result)
+        self.assertEqual(result["explanation"]["title_reason"], "junior_soc_soar_engineer")
+
+        senior = dict(job, title="Lead Security Operations Engineer")
+        self.assertEqual(evaluate(senior, CYBERSECURITY_BETA_PROFILE)["recommendation"], "skip")
+
+    def test_four_day_toronto_hybrid_constraint_is_visible(self):
+        job = self.job(
+            "Security Operations Analyst", "Toronto, ON",
+            "Monitor SIEM and EDR alerts and handle incident response. "
+            "Requires onsite at least 4 days per week.",
+            posted=RECENT_POSTED,
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn("hybrid_4_days_week", result["warnings"])
+        self.assertLess(result["location_score"], 100)
+
     def test_falcon_complete_titles_without_security_keyword(self):
         """Role-family names need SOC evidence, and location still overrides fit."""
         description = (
