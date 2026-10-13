@@ -8,6 +8,8 @@ on:
       - 'match_v3.py'
       - 'directory.py'
       - 'engine.py'
+      - 'dayforce_feed.py'
+      - 'successfactors_feed.py'
       - 'profiles_v3.py'
       - 'shadow_compare_v3.py'
       - 'requirements.txt'
