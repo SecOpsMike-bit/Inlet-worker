@@ -15,6 +15,8 @@ import re
 import urllib.request
 import urllib.error
 
+from successfactors_feed import fetch_successfactors
+
 # ============================================================ FIELDS
 
 FIELD_PROFILES = {
@@ -292,6 +294,8 @@ def pull_company(company, known=None):
             w = company["workday"]
             return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], known=known) if j]
         platform = company.get("platform")
+        if platform == "successfactors":
+            return [j for j in fetch_successfactors(company.get("board_url")) if j]
         if platform == "smartrecruiters":
             return [j for j in fetch_smartrecruiters(company["slug"], known=known) if j]
         if platform in _FETCHERS:                     # greenhouse/lever/ashby: list already has text
@@ -316,9 +320,21 @@ def pull_company_diagnostic(company, workday_cap=120):
     diagnostic = {"company": name, "platform": platform, "status": "unknown",
                   "attempts": []}
 
-    if platform in ("dayforce", "successfactors"):
+    if platform == "dayforce":
         diagnostic["status"] = "unsupported_platform"
         return [], diagnostic
+
+    if platform == "successfactors":
+        try:
+            jobs = fetch_successfactors(company.get("board_url"))
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
 
     if "workday" in company:
         w = company["workday"]
