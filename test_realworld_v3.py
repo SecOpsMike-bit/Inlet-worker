@@ -216,6 +216,27 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
                 self.assertEqual(result["recommendation"], "skip")
                 self.assertEqual(result["eligibility_status"], "fail")
 
+    def test_workday_multi_location_label_does_not_create_false_canada_match(self):
+        """Live Arctic Wolf Germany-only role was listed as '2 Locations'."""
+        description = (
+            "Remote security advisor in Germany. Monitor SOC security alerts, "
+            "SIEM, EDR, incident response and managed detection and response "
+            "for customers in Europe and Canada."
+        )
+        job = self.job(
+            "Cyber Security Consultant (m/w/d) – Security Advisor | "
+            "100% Remote in Deutschland",
+            "2 Locations", description, posted=RECENT_POSTED,
+        )
+        job["url"] = (
+            "https://arcticwolf.wd1.myworkdayjobs.com/en-US/External/"
+            "job/Remote-Germany/Cyber-Security-Consultant_R26_778"
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertEqual(result["recommendation"], "skip", result)
+        self.assertEqual(result["reason"], "multi_location_unverified", result)
+        self.assertEqual(result["eligibility_status"], "fail", result)
+
     def test_current_market_examples(self):
         cases = {
             # CDW Toronto: genuine SOC L2 work: SIEM/SOAR/tickets, triage,
