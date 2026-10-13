@@ -36,11 +36,10 @@ def _directory_company_dict(c, index):
 
 
 def _v2_decision(job, company):
-    result = match_v2.process_v2(job, company)
-    if not result:
-        return "skip", None
-    score = result.get("landability") or result.get("opportunity_score")
-    return "keep", score
+    """Compare against V2's cyber lane, not its unrelated career-field fallback."""
+    result = match_v2.explain_cyber_match(job)
+    return ("keep" if result.get("accepted") else "skip",
+            result.get("score"), result.get("reason"))
 
 
 def _v3_decision(job):
@@ -97,7 +96,7 @@ def run(limit=40, source="directory", output=None):
 
             for job in jobs:
                 raw_jobs += 1
-                v2_decision, v2_score = _v2_decision(job, cd)
+                v2_decision, v2_score, v2_reason = _v2_decision(job, cd)
                 v3_decision, v3 = _v3_decision(job)
                 v3_keep = v3_decision in {"strong_apply", "apply", "maybe"}
                 disagree = (v2_decision == "keep") != v3_keep
@@ -141,6 +140,7 @@ def run(limit=40, source="directory", output=None):
                         "url": job.get("url"),
                         "v2": v2_decision,
                         "v2_score": v2_score,
+                        "v2_reason": v2_reason,
                         "v3": v3_decision,
                         "v3_score": v3.get("overall_score"),
                         "v3_reason": v3.get("reason") or v3.get("explanation", {}).get("title_reason"),
@@ -155,6 +155,7 @@ def run(limit=40, source="directory", output=None):
             "companies_with_jobs": fetched_companies,
             "raw_jobs_evaluated": raw_jobs,
             "v2_kept": v2_kept,
+            "v2_comparison_lane": "cybersecurity",
             "v3_kept": v3_kept,
             "per_company": per_company,
             "feed_status_counts": dict(feed_status_counts.most_common()),
@@ -173,7 +174,7 @@ def run(limit=40, source="directory", output=None):
             Path(output).write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
         summary = {key: report[key] for key in (
             "source", "companies_available", "companies_with_jobs",
-            "raw_jobs_evaluated", "v2_kept", "v3_kept",
+            "raw_jobs_evaluated", "v2_kept", "v3_kept", "v2_comparison_lane",
             "cyber_title_candidates_count", "disagreements",
             "per_company", "feed_status_counts", "v3_rejection_reasons",
         )}
