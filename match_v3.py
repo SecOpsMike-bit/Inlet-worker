@@ -16,6 +16,7 @@ SENIOR_TITLE_TERMS = (
 CANADA_REMOTE_TERMS = (
     "remote canada", "canada remote", "remote, canada", "anywhere in canada",
     "across canada", "throughout canada", "canada-wide", "canada wide",
+    "remote - canada", "remote within canada", "remote from canada",
 )
 
 OUTSIDE_ON_TERMS = (
@@ -126,6 +127,22 @@ def _title_fit(title, text, profile):
     conditional = [x.lower() for x in profile.get("conditional_titles", [])]
     if any(term in t for term in targets):
         return 100, "target_title"
+    # A narrow SOC-to-SOAR bridge: early-career security operations engineering
+    # with junior mentorship and automation support, not platform ownership.
+    if "security operations engineer" in t:
+        blob = _norm(text)
+        years = _required_years(text)
+        junior = any(x in blob for x in (
+            "work closely with senior", "under the guidance", "under guidance",
+            "assist in", "assist with", "foundational", "1-3 years",
+            "1–3 years", "gain hands-on experience",
+        ))
+        automation = any(x in blob for x in (
+            "soar", "security orchestration", "security automation", "playbooks",
+        ))
+        if (years is None or years <= 3) and junior and automation:
+            return 85, "junior_soc_soar_engineer"
+        return 0, "engineering_role_not_junior_soc_soar"
     if any(term in t for term in conditional):
         if _soc_evidence_count(text) < 2:
             return 0, "conditional_title_without_soc_evidence"
@@ -174,6 +191,8 @@ def _experience_score(text, profile):
 
 def _onsite_frequency_penalty(text):
     blob = _norm(text)
+    if re.search(r"(?:4|four)\\s+days?\\s+(?:per|a)\\s+week", blob):
+        return 45, "hybrid_4_days_week"
     if re.search(r"(?:3|three)\s+days?\s+(?:per|a)\s+week", blob):
         return 35, "hybrid_3_days_week"
     if re.search(r"(?:2|two)\s+days?\s+(?:per|a)\s+week", blob):
@@ -198,7 +217,8 @@ def _location_score(location, text, profile):
             return 0, "foreign_country_restricted"
 
     if any(term in loc for term in preferred):
-        return 100, None
+        penalty, warning = _onsite_frequency_penalty(text)
+        return max(55, 100 - penalty), warning
 
     remote = any(term in blob for term in (" remote ", "fully remote", "work from home", "wfh"))
     canada_remote = any(term in blob for term in CANADA_REMOTE_TERMS)
