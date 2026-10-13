@@ -1,14 +1,19 @@
+import datetime as dt
 import unittest
 
 import match_v2
 
+
+# Matching benchmarks test fit, not the age of a historical posting.
+# Recency behavior is tested separately with fixed reference dates.
+RECENT_POSTED = (dt.date.today() - dt.timedelta(days=3)).isoformat()
 
 class TakeTwoBenchmarkTest(unittest.TestCase):
     def test_take_two_security_operations_engineer(self):
         job = {
             "title": "Security Operations Engineer",
             "location": "Toronto, Ontario, Canada",
-            "posted": "2026-09-10",
+            "posted": RECENT_POSTED,
             "url": "https://example.com/taketwo",
             "text": (
                 "Support and maintain a Security Orchestration, Automation, and Response (SOAR) platform. "
