@@ -71,6 +71,15 @@ jobs:
                           if isinstance(parsed, dict):
                               result["totalCount"] = parsed.get("totalCount")
                           if isinstance(jobs, list) and jobs and isinstance(jobs[0], dict):
+                              if isinstance(jobs[0].get("data"), dict):
+                                  result["nested_job_keys"] = list(jobs[0]["data"])
+                                  result["nested_job_sample"] = {
+                                      k: str(v)[:180] for k, v in jobs[0]["data"].items()
+                                      if k in {"slug", "title", "req_id", "url", "location", "location_name",
+                                               "city", "state", "country", "country_code", "posted_date",
+                                               "date_posted", "datePosted", "posted", "job_id",
+                                               "date", "categories", "employment_type"}
+                                  }
                               result["first_job_keys"] = list(jobs[0])
                               result["first_job_sample"] = {
                                   k: str(v)[:130] for k, v in jobs[0].items()
