@@ -93,7 +93,7 @@ class FeedDiagnosticsTests(unittest.TestCase):
 
     def test_unsupported_employer_portals_are_not_empty_vacancies(self):
         from directory import DIRECTORY
-        for name, expected in (("Kinaxis", "icims"), ("GoSecure", "adp")):
+        for name, expected in (("GoSecure", "adp"),):
             with self.subTest(employer=name):
                 company = next(c for c in DIRECTORY if c["name"] == name)
                 self.assertEqual(company["platform"], expected)
@@ -102,6 +102,18 @@ class FeedDiagnosticsTests(unittest.TestCase):
                 self.assertEqual(diagnostic["status"], "unsupported_platform")
                 self.assertEqual(diagnostic["platform"], expected)
                 self.assertTrue(diagnostic["board_url"].startswith("https://"))
+
+    def test_kinaxis_uses_verified_public_jibe_api(self):
+        from directory import DIRECTORY
+        company = next(c for c in DIRECTORY if c["name"] == "Kinaxis")
+        self.assertEqual(company["platform"], "jibe")
+        sample = [{"title": "SOC Analyst", "location": "Toronto, Ontario, Canada",
+                   "url": "https://join.kinaxis.com/jobs/35553?lang=en-us",
+                   "posted": "2026-10-13", "text": "SIEM"}]
+        with patch.object(engine, "fetch_jibe_kinaxis", return_value=sample):
+            jobs, diagnostic = engine.pull_company_diagnostic(company)
+        self.assertEqual(jobs, sample)
+        self.assertEqual(diagnostic["status"], "ok")
 
     def test_auto_discovery_reports_failed_attempts(self):
         def bad_fetch(_slug):
