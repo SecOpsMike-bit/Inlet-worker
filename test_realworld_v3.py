@@ -6,14 +6,19 @@ physical-security false positives, province-restricted remote roles, and strong
 SOC roles hidden behind less-obvious titles.
 """
 
+import datetime as dt
 import unittest
 
 from match_v3 import evaluate
 from profiles_v3 import CYBERSECURITY_BETA_PROFILE
 
 
+# Matching benchmarks test fit, not the age of a historical posting.
+# Recency behavior is tested separately with fixed reference dates.
+RECENT_POSTED = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+
 class V3RealWorldBenchmarkTests(unittest.TestCase):
-    def job(self, title, location, text, posted="2026-09-09"):
+    def job(self, title, location, text, posted=RECENT_POSTED):
         return {
             "title": title,
             "location": location,
@@ -33,19 +38,19 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
             "Analyst I, Falcon Complete (Remote)",
             "Canada - Remote ON",
             description,
-            posted="2026-10-07",
+            posted=RECENT_POSTED,
         )
         restricted = self.job(
             "Analyst I, Falcon Complete (Remote, PST/MST)",
             "Canada - Remote AB; Canada - Remote BC",
             description,
-            posted="2026-10-07",
+            posted=RECENT_POSTED,
         )
         senior = self.job(
             "Sr. Analyst, Falcon Complete (Remote)",
             "Canada - Remote ON",
             description,
-            posted="2026-10-07",
+            posted=RECENT_POSTED,
         )
         eligible_result = evaluate(eligible, CYBERSECURITY_BETA_PROFILE)
         restricted_result = evaluate(restricted, CYBERSECURITY_BETA_PROFILE)
@@ -74,7 +79,7 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
             with self.subTest(location=location):
                 result = evaluate(
                     self.job("Analyst I, Falcon Complete (Remote)", location, description,
-                             posted="2026-10-07"),
+                             posted=RECENT_POSTED),
                     CYBERSECURITY_BETA_PROFILE,
                 )
                 self.assertEqual(result["recommendation"], "skip")
@@ -84,7 +89,7 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
 
         canadian = evaluate(
             self.job("Analyst I, Falcon Complete (Remote)", "Canada - Remote ON",
-                     description, posted="2026-10-07"),
+                     description, posted=RECENT_POSTED),
             CYBERSECURITY_BETA_PROFILE,
         )
         self.assertIn(canadian["recommendation"], {"strong_apply", "apply", "maybe"})
@@ -96,7 +101,7 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
         )
         result = evaluate(
             self.job("Analyst, Falcon Complete - SkillBridge",
-                     "Canada - Remote ON", description, posted="2026-10-07"),
+                     "Canada - Remote ON", description, posted=RECENT_POSTED),
             CYBERSECURITY_BETA_PROFILE,
         )
         self.assertEqual(result["recommendation"], "skip")
@@ -118,28 +123,28 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
             "perform root cause analysis, improve SIEM analytics, reduce false "
             "positives and provide client support. Requires 1 year of security "
             "experience and at least two intermediate-level security certifications.",
-            posted="2026-10-01",
+            posted=RECENT_POSTED,
         )
         us = self.job(
             "Analyst I, Falcon Complete (Hybrid, San Antonio)",
             "USA - Remote",
             "Managed detection and response, EDR, SIEM, alert triage, "
             "security monitoring, incident response.",
-            posted="2026-10-07",
+            posted=RECENT_POSTED,
         )
         uk = self.job(
             "Analyst I, Falcon Complete (Remote, GBR)",
             "United Kingdom - Remote",
             "Managed detection and response, EDR, SIEM, alert triage, "
             "security monitoring, incident response.",
-            posted="2026-10-07",
+            posted=RECENT_POSTED,
         )
         skillbridge = self.job(
             "Analyst, Falcon Complete - SkillBridge",
             "USA - St. Louis, MO",
             "Managed detection and response, EDR, SIEM, alert triage, "
             "security monitoring, incident response.",
-            posted="2026-10-07",
+            posted=RECENT_POSTED,
         )
         cdw_result = evaluate(cdw, CYBERSECURITY_BETA_PROFILE)
         self.assertIn(cdw_result["recommendation"], {"apply", "maybe", "strong_apply"})
@@ -213,7 +218,7 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
                 "employment_type": "Contract W2",
                 "text": "MUST BE CDC BADGED and ATL METRO BASED. 5+ years cybersecurity operations. "
                         "Security monitoring, incident response, vulnerability management, NIST SP 800-53, STIG and POA&M.",
-                "posted": "2026-10-05",
+                "posted": RECENT_POSTED,
                 "url": "https://www.dice.com/job-detail/0b03b580-7701-4444-a96f-5383555707bd",
             },
 
