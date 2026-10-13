@@ -4,10 +4,28 @@ import unittest
 from unittest.mock import patch
 
 import engine
-from shadow_compare_v3 import _directory_company_dict
+from shadow_compare_v3 import _directory_company_dict, _v2_decision
 
 
 class FeedDiagnosticsTests(unittest.TestCase):
+    def test_shadow_v2_does_not_count_unrelated_operations_jobs(self):
+        job = {"title": "Operations Coordinator", "location": "Toronto, ON",
+               "text": "Manage vendor relationships, warehouse operations and supply chain.",
+               "posted": "2026-10-12", "url": "https://example.com/ops"}
+        decision, score, reason = _v2_decision(job, {"name": "Example", "tier": 2})
+        self.assertEqual(decision, "skip")
+        self.assertEqual(reason, "off_target_lane")
+
+    def test_shadow_v2_accepts_real_soc_role(self):
+        import datetime as dt
+        job = {"title": "Junior Security Analyst", "location": "Toronto, ON",
+               "text": "Monitor SIEM and EDR security alerts, investigate malware, "
+                       "triage incidents, and support incident response. 1 year SOC experience.",
+               "posted": dt.date.today().isoformat(), "url": "https://example.com/soc"}
+        decision, score, reason = _v2_decision(job, {"name": "Example", "tier": 2})
+        self.assertEqual(decision, "keep")
+        self.assertGreaterEqual(score, 55)
+
     def test_explicit_unsupported_provider_is_not_no_vacancies(self):
         for provider in ("dayforce", "successfactors"):
             with self.subTest(provider=provider):
