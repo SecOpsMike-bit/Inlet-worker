@@ -27,6 +27,28 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
             "url": "https://example.com/realworld-benchmark",
         }
 
+    def test_security_administrator_requires_real_soc_duties(self):
+        """Posh-style operational security roles are eligible; admin-only ones are not."""
+        soc = self.job(
+            "Security Administrator / SOC Analyst",
+            "Remote - Canada",
+            "Security operations center, SIEM, EDR, triage alerts, investigate "
+            "security incidents, incident response, threat hunting, "
+            "malware analysis and client-facing remediation.",
+            posted=RECENT_POSTED,
+        )
+        administrative = self.job(
+            "Security Administrator",
+            "Toronto, ON",
+            "Manage office badges, physical security cameras, door access, "
+            "facilities keys, visitor sign-in, and building administration.",
+            posted=RECENT_POSTED,
+        )
+        good = evaluate(soc, CYBERSECURITY_BETA_PROFILE)
+        bad = evaluate(administrative, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(good["recommendation"], {"strong_apply", "apply", "maybe"})
+        self.assertEqual(bad["recommendation"], "skip")
+
     def test_falcon_complete_titles_without_security_keyword(self):
         """Role-family names need SOC evidence, and location still overrides fit."""
         description = (
