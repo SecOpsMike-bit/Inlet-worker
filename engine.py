@@ -17,6 +17,7 @@ import urllib.error
 
 from successfactors_feed import fetch_successfactors
 from dayforce_feed import fetch_dayforce
+from shopify_feed import fetch_shopify
 
 # ============================================================ FIELDS
 
@@ -295,6 +296,8 @@ def pull_company(company, known=None):
             w = company["workday"]
             return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], known=known) if j]
         platform = company.get("platform")
+        if platform == "shopify":
+            return [j for j in fetch_shopify() if j]
         if platform == "dayforce":
             return [j for j in fetch_dayforce(company.get("slug")) if j]
         if platform == "successfactors":
@@ -322,6 +325,18 @@ def pull_company_diagnostic(company, workday_cap=120):
         platform = "workday"
     diagnostic = {"company": name, "platform": platform, "status": "unknown",
                   "attempts": []}
+
+    if platform == "shopify":
+        try:
+            jobs = fetch_shopify()
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
 
     if platform == "dayforce":
         if not company.get("slug"):
