@@ -18,6 +18,7 @@ import urllib.error
 from successfactors_feed import fetch_successfactors
 from dayforce_feed import fetch_dayforce
 from shopify_feed import fetch_shopify
+from jibe_feed import fetch_jibe_kinaxis
 
 # ============================================================ FIELDS
 
@@ -296,8 +297,10 @@ def pull_company(company, known=None):
             w = company["workday"]
             return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], known=known) if j]
         platform = company.get("platform")
-        if platform in {"icims", "adp"}:
-            return []  # explicitly unsupported; never fall back to an unrelated slug
+        if platform == "jibe":
+            return [j for j in fetch_jibe_kinaxis() if j]
+        if platform == "adp":
+            return []  # unsupported; never fall back to an unrelated slug
         if platform == "shopify":
             return [j for j in fetch_shopify() if j]
         if platform == "dayforce":
@@ -328,7 +331,19 @@ def pull_company_diagnostic(company, workday_cap=120):
     diagnostic = {"company": name, "platform": platform, "status": "unknown",
                   "attempts": []}
 
-    if platform in {"icims", "adp"}:
+    if platform == "jibe":
+        try:
+            jobs = fetch_jibe_kinaxis()
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
+
+    if platform == "adp":
         diagnostic["status"] = "unsupported_platform"
         diagnostic["board_url"] = company.get("board_url", "")
         return [], diagnostic
