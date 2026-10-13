@@ -14,7 +14,8 @@ DIRECTORY = [
     # Still to resolve (find each careers URL, then convert to a workday{} entry or correct slug):
     {"name": "eSentire",           "tier": 1, "slug": "esentire", "platform": "dayforce"},  # verified official public JobFeeds API
     {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect"},
-    {"name": "GoSecure",           "tier": 1, "slug": "gosecure"},
+    {"name": "GoSecure",           "tier": 1, "slug": "gosecure", "platform": "adp",
+     "board_url": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=5d5085c5-5799-40cd-ae96-c7e0621cd1bc"},  # employer-linked ADP recruiting
 
     # Tier 2 - finance / fintech (high volume; Workday)
     {"name": "RBC",                "tier": 2, "workday": {"tenant": "rbc", "pod": "wd3", "site": "RBCGLOBAL1"}},          # confirmed
@@ -23,7 +24,8 @@ DIRECTORY = [
     {"name": "TELUS Digital Solutions", "tier": 2, "slug": "telus-digital", "platform": "ashby"},  # employer-linked Digital Solutions board
 
     # Tier 3 - logistics / supply chain / retail (the ops-background edge)
-    {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis"},
+    {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis", "platform": "icims",
+     "board_url": "https://join.kinaxis.com/jobs"},  # verified iCIMS/Jibe portal; API integration pending
     {"name": "Descartes",          "tier": 3, "slug": "descartes", "platform": "successfactors",
      "board_url": "https://jobs.descartes.com/go/View-All-Jobs/2574817/"},  # verified official employer board
     {"name": "Shopify",            "tier": 3, "platform": "shopify", "slug": "shopify"},  # official first-party careers HTML
