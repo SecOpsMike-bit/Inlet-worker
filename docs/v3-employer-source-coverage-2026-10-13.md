@@ -1,31 +1,54 @@
-# GetInlets V3 — verified employer feed coverage (13 October 2026)
+# GetInlets V3 — employer feed coverage (updated 13 October 2026)
 
 **Branch:** `v3-profile-matching`, draft PR #3. **Production V2 unchanged.**
 
-## Verified live coverage
+## Current result: all 17 configured employers now have verified working feeds
 
-- **17 employers configured.** Last completed full shadow comparison before the new connectors: [run 38484430605](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38484430605): **810 raw jobs from 13 employers**, 7 V2 cyber-lane keeps, 2 V3 maybes (AlphaSense and Take-Two).
-- **eSentire** public Dayforce JobFeeds: 18 postings, 9 Canadian-location, 0 V3 cyber matches. Live verified in [run 38486617332](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38486617332).
-- **TELUS Digital Solutions** Ashby: 56 postings, 13 Canadian-location, 0 V3 cyber matches. Same smoke run.
-- **Shopify** employer-hosted `https://www.shopify.com/careers`: **31 live role links**, 2 Canadian-location, 0 V3 cyber matches. First-party HTML adapter `shopify_feed.py` is in place and smoke-tested. Do **not** assume `jobs.ashbyhq.com/shopify` exists; both lowercase and capitalized public Ashby job-board API slugs returned HTTP 404.
-- **Kinaxis** employer-hosted iCIMS/Jibe public `https://join.kinaxis.com/api/jobs?page=N`: **108 live postings**, 46 Canadian-location, 0 V3 cyber matches. `jibe_feed.py` fetches paginated public JSON with title, location, employer-hosted application URL, posting date and description. Smoke-tested in the same run. The credentialed `api.icims.com` partner API is **not used**.
-- **Descartes** employer-hosted SuccessFactors: 24 postings in the last completed full comparison; diagnostic `ok`.
+The last completed full shadow before resolving the final two sources, [run 38486580376](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38486580376), evaluated **949 raw jobs from 15 working feeds**. It retained **two V3 `maybe` recommendations**, AlphaSense Security Operations Analyst II (Canada remote; 4 years) and Take-Two Security Operations Engineer (Toronto; 3 years). Do not claim a later full total until the 17-employer shadow finishes.
 
-These numbers are snapshots, not guarantees of vacancy counts later.
+Live [priority-feed smoke run 38487872296](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38487872296) passed for **all six** newly verified employer feeds:
 
-## Remaining unresolved / unsupported sources
+| Employer | Public source | Live postings | Canadian-location postings | V3 matches |
+|---|---|---:|---:|---:|
+| eSentire | Dayforce JobFeeds | 18 | 9 | 0 |
+| TELUS Digital Solutions | Ashby | 56 | 13 | 0 |
+| Shopify | First-party careers HTML | 31 | 2 | 0 |
+| Kinaxis | Public iCIMS/Jibe `/api/jobs?page=N` | 108 | 46 | 0 |
+| Field Effect | Dayforce JobFeeds (`fieldeffect`) | 3 unique | 3 | 0 |
+| GoSecure | ADP Workforce Now public career-centre requisitions | 2 | 2 | 0 |
 
-1. **GoSecure** — official careers page links to ADP Workforce Now recruiting, with `cid=5d5085c5-5799-40cd-ae96-c7e0621cd1bc`. The directory records the actual recruitment URL. Diagnostic status `unsupported_platform` is **not** a claim of zero vacancies. A safe ADP public job-list integration is the next connector task.
-2. **Field Effect** — `https://fieldeffect.com/careers` returns a careers page but no recognized job-board links in its static HTML. The directory remains `unresolved_feed`; investigate its dynamically rendered openings source. Do not report zero vacancies.
+Counts are point-in-time snapshots, not guarantees of future vacancy counts.
 
-## Safeguards and test evidence
+## Final two sources resolved
 
-- The four newly investigated sources are not silently assigned fake Greenhouse/Lever/Ashby slugs.
-- New adapters are read-only, use public employer-hosted endpoints, bound request counts, and emit the normalized job fields expected by `match_v3.evaluate`.
-- The `test_shopify_feed.py` and `test_jibe_feed.py` suites cover parsing, deduplication, bounded fetches, error status and normalization. `test_feed_diagnostics.py` checks that unsupported ADP is not misreported as empty.
-- Latest [smoke test run 38486617332](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38486617332) and [test run 38486622730](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38486622730) both **passed**.
-- A fresh full shadow comparison with Kinaxis activated was running at the time of this note; do not report a new total until it completes.
+### Field Effect — official Dayforce
+
+Field Effect's own [careers page](https://fieldeffect.com/careers) links to `https://can231.dayforcehcm.com/CandidatePortal/en-US/fieldeffect`. The officially documented public `https://www.dayforcehcm.com/api/fieldeffect/V1/JobFeeds` redirects to an accessible Dayforce services host and returned four records, including one duplicate, for **three unique roles**.
+
+One role looks highly relevant by title: [Cyber Security Analyst](https://jobs.dayforcehcm.com/en-US/fieldeffect/CANDIDATEPORTAL/jobs/702), posted 2026-09-29. However, the feed's structured location is **BC, Canada**, and the description explicitly says **Western Canada (remote position)**. The Toronto/Ontario beta profile correctly rejects it with `outside_ontario`. **Do not loosen the remote eligibility rule or present this as an Ontario-eligible match.**
+
+### GoSecure — public ADP recruiting API
+
+GoSecure's [official careers page](https://legacy.gosecure.ai/careers/) links to the ADP Workforce Now recruitment page with `cid=5d5085c5-5799-40cd-ae96-c7e0621cd1bc`.
+
+The verified **public, anonymous** list endpoint is:
+
+`https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/job-requisitions`
+
+with `cid`, external `ccId=19000101_000001`, one-based `$skip=1` and `$top=20`. The feed returned two roles: Account Executive (Ontario Only) and SOC Director. The latter is excluded for seniority by V3's existing `excluded_title` rule, even though its locations include Toronto.
+
+New `adp_feed.py` uses only the public external career centre, validates the employer-hosted URL, pages conservatively, deduplicates by requisition ID, and optionally enriches from public requisition detail. It does **not** access authenticated ADP partner APIs or applicant data.
+
+## Engineering and validation
+
+- `directory.py` now has **17/17 verified platform configurations**, with Field Effect as `dayforce` and GoSecure as `adp`.
+- `engine.py` uses `fetch_adp` in both normal and diagnostic paths. Failed list requests are `fetch_error`, not `empty_feed`.
+- `test_adp_feed.py` covers tenant safety, public-only centre, one-based pagination, duplicate removal, detail failures and schema errors.
+- `test_feed_diagnostics.py` covers GoSecure and Field Effect wiring and HTTP error handling.
+- `test_realworld_v3.py` includes the exact Field Effect BC-only and GoSecure SOC Director eligibility signals.
+- [CI run 38487876577](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38487876577) passed with both adapters active; subsequent regression additions also require CI.
+- `shadow-compare-v3.yml` now triggers on all current adapter files, including `adp_feed.py`, `shopify_feed.py`, and `jibe_feed.py`. The shadow workflow remains read-only and does not write production records.
 
 ## Next priority
 
-Resolve GoSecure ADP's publicly accessible posting feed and Field Effect's dynamically rendered source **without** using third-party scraped job links as authoritative employer vacancies. Then audit the resulting V3 decisions and ensure employer location and hard eligibility requirements remain intact. Keep PR #3 draft until explicitly authorized to merge.
+Now that employer feed health is resolved, **increase eligible Canadian SOC/MDR coverage** by verifying additional employer-hosted feeds for organizations with genuine junior SOC, security operations, incident response and MSSP roles in Ontario or Canada-remote. Maintain strict eligibility and geography checks; do not inflate recommendation counts with senior, BC-only, US-only or unrelated jobs. Keep V3 in draft PR #3 until explicit merge/deployment authorization.
