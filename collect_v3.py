@@ -26,8 +26,25 @@ def companies_from_directory():
 
 
 def fetch_company(company):
-    """Use existing platform fetchers, but never invoke their scoring or DB worker."""
-    return engine.pull_company(company)
+    """Fetch from a known platform without suppressing network/API errors.
+
+    Unknown-platform discovery is deliberately rejected until its source is
+    resolved: engine.discover() swallows errors and would report false empties.
+    """
+    if "workday" in company:
+        w = company["workday"]
+        return [j for j in engine.fetch_workday(w["tenant"], w["pod"], w["site"]) if j]
+    platform = company.get("platform")
+    slug = company.get("slug")
+    fetchers = {
+        "greenhouse": engine.fetch_greenhouse,
+        "lever": engine.fetch_lever,
+        "ashby": engine.fetch_ashby,
+        "smartrecruiters": engine.fetch_smartrecruiters,
+    }
+    if platform not in fetchers:
+        raise ValueError("Unresolved feed platform; verify employer source before collection")
+    return [j for j in fetchers[platform](slug) if j]
 
 
 def main(argv=None):
@@ -48,13 +65,12 @@ def main(argv=None):
         if missing:
             parser.error("Unknown company: " + ", ".join(sorted(missing)))
 
-    # Current engine.pull_company converts fetch errors to [], making failures
-    # indistinguishable from empty boards. Do not report false success.
-    # Wrap platform-specific functions directly for known platform types.
+    # Known-platform fetch errors remain visible. Unknown feeds are errors,
+    # never silently interpreted as employers with zero jobs.
     result = collect_batch(selected, fetch_company)
     result["warning"] = (
-        "Legacy engine.pull_company suppresses feed exceptions; empty results "
-        "can mean failure. Do not interpret empty feeds as verified zero openings."
+        "Unresolved employer feed platforms are errors, not verified empty boards. "
+        "Workday's legacy per-search error suppression still requires hardening."
     )
     save_staging_json(result, args.output)
     print(json.dumps({"output": args.output, "stats": result["stats"],
