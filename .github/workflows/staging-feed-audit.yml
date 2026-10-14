@@ -1,0 +1,46 @@
+name: Inlet v3 staging feed audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/collector-v3-staging
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run tests before collecting
+        run: python -m unittest -v test_collector_v3.py test_collect_v3.py test_workday_v3.py
+      - name: Fetch employer jobs into local staging snapshot
+        # Keep the audit read-only: no DATABASE_URL and no Supabase credentials.
+        run: |
+          python collect_v3.py --company Cyderes --company Arctic Wolf --company Optiv --output staging/cyber-audit.json || true
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('staging/cyber-audit.json')
+          if not p.exists():
+              raise SystemExit('Collector failed to produce an audit snapshot')
+          d = json.loads(p.read_text())
+          stats = d['stats']
+          print('STAGING AUDIT STATS:', json.dumps(stats, sort_keys=True))
+          for c in d['companies']:
+              print('EMPLOYER:', c['company'], c['status'], 'fetched=', c['fetched'], 'valid=', c['valid'])
+          if stats['companies_error']:
+              print('WARNING: Some employer feeds failed; counts are incomplete')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inlet-v3-cyber-audit
+          path: staging/cyber-audit.json
+          if-no-files-found: warn
+          retention-days: 7
