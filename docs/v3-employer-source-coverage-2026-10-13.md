@@ -49,6 +49,18 @@ New `adp_feed.py` uses only the public external career centre, validates the emp
 - [CI run 38487876577](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38487876577) passed with both adapters active; subsequent regression additions also require CI.
 - `shadow-compare-v3.yml` now triggers on all current adapter files, including `adp_feed.py`, `shopify_feed.py`, and `jibe_feed.py`. The shadow workflow remains read-only and does not write production records.
 
+## 14 October follow-up: targeted Canadian SOC employer expansion
+
+**Added:** Rush Street Interactive, the 18th configured employer, using its verified public Greenhouse board `rushstreetinteractive`. Live [prospective employer audit 38489328339](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38489328339) confirmed **24 current job postings**, including an actual [SOC Analyst — Canada](https://job-boards.greenhouse.io/rushstreetinteractive/jobs/6188413004) role. The posting states 2+ years of cybersecurity experience, SIEM alert triage, investigation, incident response and XDR, and displays **CAD $75,000–$96,309** as the Canadian pay range.
+
+**Verified V3 result:** [priority feed smoke run 38489533850](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38489533850) passed, found **24 jobs / 2 Canadian locations / 1 V3 recommendation**, and scored the Canada SOC Analyst **73, `apply`, no warnings**. The Greenhouse feed and matching were tested live, not inferred from search snippets.
+
+**Eligibility correction:** Greenhouse lists this job's structured location simply as `Canada`, while the description explicitly carries `#LI-REMOTE`. Previously V3 returned `location_incompatible` despite the employer verifying Canada eligibility. `match_v3.py` now treats a structured Canada-only location as country eligible: verified remote tags score 95, while unknown work arrangements score 68 and carry `canada_work_arrangement_unverified`. It also removed ambiguous lowercase `on` from the Canadian-country detector so `USA - On Site` cannot be misread as Ontario. Regression tests cover both cases. [CI run 38489540835](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38489540835) passed.
+
+**Other prospects audited, not added:** Fortra's historical Greenhouse slug returned HTTP 404; Horizon3.ai's live Ashby board returned no eligible Canadian SOC role; Long View Systems' live Lever API had no SOC listing despite older search-engine listings; Georgian's live Ashby board had no current security analyst posting. Their vacancies must not be invented or represented as current.
+
+The 18-employer full shadow run will provide a new total; **do not use the 17-employer 954-job baseline as if it were the expanded run**. All changes remain on the draft V3 branch; production V2 unchanged.
+
 ## Next priority
 
-Now that employer feed health is resolved, **increase eligible Canadian SOC/MDR coverage** by verifying additional employer-hosted feeds for organizations with genuine junior SOC, security operations, incident response and MSSP roles in Ontario or Canada-remote. Maintain strict eligibility and geography checks; do not inflate recommendation counts with senior, BC-only, US-only or unrelated jobs. Keep V3 in draft PR #3 until explicit merge/deployment authorization.
+With 18 employer sources and one newly verified `apply` match, **continue increasing eligible Canadian SOC/MDR coverage** by verifying additional employer-hosted feeds for organizations with genuine junior SOC, security operations, incident response and MSSP roles in Ontario or Canada-remote. Maintain strict eligibility and geography checks; do not inflate recommendation counts with senior, BC-only, US-only or unrelated jobs. Keep V3 in draft PR #3 until explicit merge/deployment authorization.
