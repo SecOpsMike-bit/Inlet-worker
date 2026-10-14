@@ -122,7 +122,9 @@ def refresh(demo=False):
             s.commit()                          # persist progress per company
 
         # Preserve listings from companies not yet refreshed.
-        # Successful company refreshes already replace their old roles. cutoff = dt.datetime.utcnow() - dt.timedelta(days=STALE_DAYS)swept = 0
+        # Successful company refreshes already replace their old roles.
+        cutoff = dt.datetime.utcnow() - dt.timedelta(days=STALE_DAYS)
+        swept = 0
         total = s.query(db.Role).count()
         remaining = s.query(db.Company).filter(
             db.Company.active == True,
