@@ -37,7 +37,7 @@ FOREIGN_LOCATION_RE = re.compile(
 )
 CANADIAN_LOCATION_RE = re.compile(
     r"\b(?:canada|canadian|ontario|toronto|mississauga|north york|"
-    r"brampton|markham|vaughan|waterloo|kitchener|hamilton|on)\b",
+    r"brampton|markham|vaughan|waterloo|kitchener|hamilton)\b",
     re.IGNORECASE,
 )
 
@@ -231,6 +231,13 @@ def _location_score(location, text, profile):
     remote = any(term in blob for term in (" remote ", "fully remote", "work from home", "wfh"))
     canada_remote = any(term in blob for term in CANADA_REMOTE_TERMS)
     outside_on = any(term in loc for term in OUTSIDE_ON_TERMS)
+
+    # A structured location of just "Canada" establishes country eligibility,
+    # but not an onsite city. Only a job-specific remote tag verifies remote work.
+    if loc.strip() in ("canada", "ca"):
+        if re.search(r"(?<!\\w)#li-remote\\b", text or "", re.I):
+            return 95, None
+        return 68, "canada_work_arrangement_unverified"
 
     if remote and canada_remote:
         return 100, None
