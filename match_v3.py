@@ -235,7 +235,7 @@ def _location_score(location, text, profile):
     # A structured location of just "Canada" establishes country eligibility,
     # but not an onsite city. Only a job-specific remote tag verifies remote work.
     if loc.strip() in ("canada", "ca"):
-        if re.search(r"(?<!\\w)#li-remote\\b", text or "", re.I):
+        if re.search(r"(?<!\w)#li-remote\b", text or "", re.I):
             return 95, None
         return 68, "canada_work_arrangement_unverified"
 
