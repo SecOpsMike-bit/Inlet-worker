@@ -8,8 +8,8 @@ from pathlib import Path
 
 CYBER_TERMS = re.compile(
     r"cyber|information security|it security|security (?:operations|analyst|engineer|specialist|architect|incident|monitoring)"
-    r"|\\bsoc\\b|threat (?:analyst|detection|hunter|intelligence)|incident (?:response|responder)"
-    r"|detection (?:engineer|analyst)|\\bdfir\\b|\\bmdr\\b|\\bsiem\\b", re.I
+    r"|\bsoc\b|threat (?:analyst|detection|hunter|intelligence)|incident (?:response|responder)"
+    r"|detection (?:engineer|analyst)|\bdfir\b|\bmdr\b|\bsiem\b", re.I
 )
 NON_CYBER = re.compile(
     r"financial security|security advisor|estate planning|physical security|security guard"
