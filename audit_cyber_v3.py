@@ -14,7 +14,7 @@ SENIOR_TERMS = re.compile(r"\bsenior\b|\bsr\.?\b|\blead\b|\bprincipal\b|\bstaff\
 
 def summarize(postings):
     by_company = Counter(x.get("source_company", "") for x in postings)
-    title_cyber = [x for x in postings if CYBER_TERMS.search(x.get("title", ""))]
+    title_cyber = [x for x in postings if is_cyber_title(x.get("title", ""))]
     canada_explicit = [x for x in title_cyber if CANADA_TERMS.search(x.get("location", ""))]
     remote_unspecified = [x for x in title_cyber if REMOTE_TERMS.search(x.get("location", "")) and not CANADA_TERMS.search(x.get("location", ""))]
     review = [x for x in canada_explicit if not SENIOR_TERMS.search(x.get("title", ""))]
