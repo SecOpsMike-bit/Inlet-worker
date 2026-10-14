@@ -1,0 +1,394 @@
+"""Real-world regression cases for GetInlets V3.
+
+These fixtures are concise paraphrases of live/recent Canadian postings reviewed
+in September 2026. They exist to catch common search/matching mistakes such as
+physical-security false positives, province-restricted remote roles, and strong
+SOC roles hidden behind less-obvious titles.
+"""
+
+import datetime as dt
+import unittest
+
+from match_v3 import evaluate
+from profiles_v3 import CYBERSECURITY_BETA_PROFILE
+
+
+# Matching benchmarks test fit, not the age of a historical posting.
+# Recency behavior is tested separately with fixed reference dates.
+RECENT_POSTED = (dt.date.today() - dt.timedelta(days=3)).isoformat()
+
+class V3RealWorldBenchmarkTests(unittest.TestCase):
+    def job(self, title, location, text, posted=RECENT_POSTED):
+        return {
+            "title": title,
+            "location": location,
+            "text": text,
+            "posted": posted,
+            "url": "https://example.com/realworld-benchmark",
+        }
+
+    def test_security_administrator_requires_real_soc_duties(self):
+        """Posh-style operational security roles are eligible; admin-only ones are not."""
+        soc = self.job(
+            "Security Administrator",
+            "Remote - Canada",
+            "Security operations center, SIEM, EDR, triage alerts, investigate "
+            "security incidents, incident response, threat hunting, "
+            "malware analysis and client-facing remediation.",
+            posted=RECENT_POSTED,
+        )
+        administrative = self.job(
+            "Security Administrator",
+            "Toronto, ON",
+            "Manage office badges, physical security cameras, door access, "
+            "facilities keys, visitor sign-in, and building administration.",
+            posted=RECENT_POSTED,
+        )
+        good = evaluate(soc, CYBERSECURITY_BETA_PROFILE)
+        bad = evaluate(administrative, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(good["recommendation"], {"strong_apply", "apply", "maybe"})
+        self.assertEqual(bad["recommendation"], "skip")
+
+    def test_verified_alphasense_canada_remote_location(self):
+        job = self.job(
+            "Security Operations Analyst II", "Remote - Canada; Vancouver",
+            "Remote within Canada, able to work in the Pacific time zone. "
+            "Monitor SIEM and EDR security alerts, alert triage, incident response, "
+            "cloud audit logs, MITRE ATT&CK, malware, case documentation and escalation. "
+            "2-4 years of SOC experience.",
+            posted=RECENT_POSTED,
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertNotEqual(result["eligibility_status"], "fail", result)
+        self.assertGreater(result["location_score"], 0)
+
+    def test_verified_taketwo_junior_security_operations_engineer(self):
+        job = self.job(
+            "Security Operations Engineer", "Toronto, Ontario, Canada",
+            "Work closely with senior engineers and assist in SOAR playbooks, "
+            "security automation, incident response, SIEM and EDR integrations. "
+            "Foundational Python scripting, MITRE ATT&CK, and 1-3 years of experience.",
+            posted=RECENT_POSTED,
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(result["recommendation"], {"apply", "maybe", "strong_apply"}, result)
+        self.assertEqual(result["explanation"]["title_reason"], "junior_soc_soar_engineer")
+
+        senior = dict(job, title="Lead Security Operations Engineer")
+        self.assertEqual(evaluate(senior, CYBERSECURITY_BETA_PROFILE)["recommendation"], "skip")
+
+    def test_four_day_toronto_hybrid_constraint_is_visible(self):
+        job = self.job(
+            "Security Operations Analyst", "Toronto, ON",
+            "Monitor SIEM and EDR alerts and handle incident response. "
+            "Requires onsite at least 4 days per week.",
+            posted=RECENT_POSTED,
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn("hybrid_4_days_week", result["warnings"])
+        self.assertLess(result["location_score"], 100)
+
+    def test_falcon_complete_titles_without_security_keyword(self):
+        """Role-family names need SOC evidence, and location still overrides fit."""
+        description = (
+            "Virtual SOC analyst for managed detection and response customers. "
+            "Security monitoring, SIEM, EDR, incident response, alert triage, "
+            "malware investigation, Windows and Linux, client-facing remediation."
+        )
+        eligible = self.job(
+            "Analyst I, Falcon Complete (Remote)",
+            "Canada - Remote ON",
+            description,
+            posted=RECENT_POSTED,
+        )
+        restricted = self.job(
+            "Analyst I, Falcon Complete (Remote, PST/MST)",
+            "Canada - Remote AB; Canada - Remote BC",
+            description,
+            posted=RECENT_POSTED,
+        )
+        senior = self.job(
+            "Sr. Analyst, Falcon Complete (Remote)",
+            "Canada - Remote ON",
+            description,
+            posted=RECENT_POSTED,
+        )
+        eligible_result = evaluate(eligible, CYBERSECURITY_BETA_PROFILE)
+        restricted_result = evaluate(restricted, CYBERSECURITY_BETA_PROFILE)
+        senior_result = evaluate(senior, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(eligible_result["recommendation"], {"strong_apply", "apply", "maybe"})
+        self.assertEqual(restricted_result["recommendation"], "skip")
+        self.assertEqual(restricted_result["eligibility_status"], "fail")
+        self.assertEqual(senior_result["recommendation"], "skip")
+
+    def test_foreign_remote_is_not_canada_eligible(self):
+        """ATS 'Remote' jobs outside Canada must never reach Apply/Maybe."""
+        description = (
+            "Managed detection and response virtual SOC: SIEM, EDR, "
+            "security monitoring, alert triage, incident response, Windows, "
+            "Linux, malware investigation, client-facing remediation."
+        )
+        foreign_locations = [
+            "USA - Remote",
+            "United Kingdom - Remote",
+            "United States",
+            "Remote - US",
+            "India - Remote",
+            "Remote, Denmark",
+            "USA - On Site",
+            "United Kingdom - On Site",
+        ]
+        for location in foreign_locations:
+            with self.subTest(location=location):
+                result = evaluate(
+                    self.job("Analyst I, Falcon Complete (Remote)", location, description,
+                             posted=RECENT_POSTED),
+                    CYBERSECURITY_BETA_PROFILE,
+                )
+                self.assertEqual(result["recommendation"], "skip")
+                self.assertEqual(result["eligibility_status"], "fail")
+                self.assertIn("foreign_country_restricted", result["warnings"])
+                self.assertEqual(result["reason"], "foreign_country_restricted")
+
+        canadian = evaluate(
+            self.job("Analyst I, Falcon Complete (Remote)", "Canada - Remote ON",
+                     description, posted=RECENT_POSTED),
+            CYBERSECURITY_BETA_PROFILE,
+        )
+        self.assertIn(canadian["recommendation"], {"strong_apply", "apply", "maybe"})
+
+    def test_skillbridge_is_not_regular_entry_level_opening(self):
+        description = (
+            "Virtual SOC managed detection and response, SIEM, EDR, "
+            "security monitoring, alert triage, incident response, malware."
+        )
+        result = evaluate(
+            self.job("Analyst, Falcon Complete - SkillBridge",
+                     "Canada - Remote ON", description, posted=RECENT_POSTED),
+            CYBERSECURITY_BETA_PROFILE,
+        )
+        self.assertEqual(result["recommendation"], "skip")
+        self.assertIn("us_skillbridge_program", result["warnings"])
+
+    def test_live_shadow_candidates_from_october_2026(self):
+        """Regression cases from the 2026-10-08 ATS shadow comparison.
+
+        The CDW description is a concise paraphrase of its published posting.
+        The other examples preserve the exact title/location eligibility signals
+        that caused the earlier false-positive recommendations.
+        """
+        cdw = self.job(
+            "Security Specialist",
+            "Mississauga / Forsythe - ON 44",
+            "Second-level cybersecurity incident response in a managed detection "
+            "and response SOC, primarily Microsoft Sentinel and Defender. "
+            "Monitor, triage, investigate, remediate and escalate incidents; "
+            "perform root cause analysis, improve SIEM analytics, reduce false "
+            "positives and provide client support. Requires 1 year of security "
+            "experience and at least two intermediate-level security certifications.",
+            posted=RECENT_POSTED,
+        )
+        us = self.job(
+            "Analyst I, Falcon Complete (Hybrid, San Antonio)",
+            "USA - Remote",
+            "Managed detection and response, EDR, SIEM, alert triage, "
+            "security monitoring, incident response.",
+            posted=RECENT_POSTED,
+        )
+        uk = self.job(
+            "Analyst I, Falcon Complete (Remote, GBR)",
+            "United Kingdom - Remote",
+            "Managed detection and response, EDR, SIEM, alert triage, "
+            "security monitoring, incident response.",
+            posted=RECENT_POSTED,
+        )
+        skillbridge = self.job(
+            "Analyst, Falcon Complete - SkillBridge",
+            "USA - St. Louis, MO",
+            "Managed detection and response, EDR, SIEM, alert triage, "
+            "security monitoring, incident response.",
+            posted=RECENT_POSTED,
+        )
+        cdw_result = evaluate(cdw, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(cdw_result["recommendation"], {"apply", "maybe", "strong_apply"})
+        self.assertIn("verify_two_intermediate_security_certifications", cdw_result["warnings"])
+        for case in (us, uk, skillbridge):
+            with self.subTest(title=case["title"]):
+                result = evaluate(case, CYBERSECURITY_BETA_PROFILE)
+                self.assertEqual(result["recommendation"], "skip")
+                self.assertEqual(result["eligibility_status"], "fail")
+
+    def test_workday_multi_location_label_does_not_create_false_canada_match(self):
+        """Live Arctic Wolf Germany-only role was listed as '2 Locations'."""
+        description = (
+            "Remote security advisor in Germany. Monitor SOC security alerts, "
+            "SIEM, EDR, incident response and managed detection and response "
+            "for customers in Europe and Canada."
+        )
+        job = self.job(
+            "Cyber Security Consultant (m/w/d) – Security Advisor | "
+            "100% Remote in Deutschland",
+            "2 Locations", description, posted=RECENT_POSTED,
+        )
+        job["url"] = (
+            "https://arcticwolf.wd1.myworkdayjobs.com/en-US/External/"
+            "job/Remote-Germany/Cyber-Security-Consultant_R26_778"
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertEqual(result["recommendation"], "skip", result)
+        self.assertEqual(result["reason"], "multi_location_unverified", result)
+        self.assertEqual(result["eligibility_status"], "fail", result)
+
+    def test_rush_street_canada_soc_analyst_location(self):
+        """Verified Canada-wide Greenhouse posting is not a location false negative."""
+        job = self.job(
+            "SOC Analyst", "Canada",
+            "Monitor SIEM security events and alerts, investigate anomalies, "
+            "respond to security incidents using incident response playbooks, "
+            "maintain security monitoring and detection rules, EDR and XDR, "
+            "vulnerability scanners, Windows and Linux, network firewalls and VPN. "
+            "2+ years of cybersecurity experience. #LI-REMOTE",
+            posted=RECENT_POSTED,
+        )
+        job["url"] = (
+            "https://job-boards.greenhouse.io/rushstreetinteractive/jobs/6188413004"
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(result["recommendation"], {"apply", "maybe", "strong_apply"}, result)
+        self.assertEqual(result["location_score"], 95)
+        self.assertNotEqual(result["eligibility_status"], "fail")
+
+        # A country-only location without a remote-work declaration remains
+        # potentially eligible but must carry a work-arrangement warning.
+        unspecified = dict(job, text=job["text"].replace("#LI-REMOTE", ""))
+        uncertain = evaluate(unspecified, CYBERSECURITY_BETA_PROFILE)
+        self.assertEqual(uncertain["location_score"], 68)
+        self.assertIn("canada_work_arrangement_unverified", uncertain["warnings"])
+
+    def test_october_2026_field_effect_and_gosecure_live_feeds(self):
+        """Employer-hosted ATS jobs must still obey location and seniority rules."""
+        field_effect = self.job(
+            "Cyber Security Analyst", "BC, Canada",
+            "Field Effect Analytic Operations team in Western Canada (remote position). "
+            "Investigate MDR platform security alerts, analyze sensor telemetry, "
+            "SIEM, EDR, threat detection and incident response for customers.",
+            posted="2026-09-29",
+        )
+        field_effect["url"] = (
+            "https://jobs.dayforcehcm.com/en-US/fieldeffect/"
+            "CANDIDATEPORTAL/jobs/702"
+        )
+        gosecure = self.job(
+            "SOC Director", "Montréal, QC, CA / Toronto, ON, CA / Ottawa, CA",
+            "Lead the managed detection and response security operations center. "
+            "Oversee SOC analysts, threat hunting, SIEM, incident response.",
+            posted=RECENT_POSTED,
+        )
+        gosecure["url"] = (
+            "https://workforcenow.adp.com/mascsr/default/mdf/"
+            "recruitment/recruitment.html?jobId=584190"
+        )
+        bc = evaluate(field_effect, CYBERSECURITY_BETA_PROFILE)
+        senior = evaluate(gosecure, CYBERSECURITY_BETA_PROFILE)
+        self.assertEqual(bc["recommendation"], "skip")
+        self.assertEqual(bc["reason"], "outside_ontario")
+        self.assertEqual(bc["eligibility_status"], "fail")
+        self.assertEqual(senior["recommendation"], "skip")
+        self.assertEqual(senior["reason"], "excluded_title")
+
+    def test_current_market_examples(self):
+        cases = {
+            # CDW Toronto: genuine SOC L2 work: SIEM/SOAR/tickets, triage,
+            # investigation, response and escalation.
+            "cdw_l2": self.job(
+                "Cyber Security Analyst (L2)",
+                "Toronto, ON",
+                "Security Operations Centre role. Monitor and investigate security events from SIEM, SOAR, tickets, "
+                "email and phone. Triage, respond and escalate to senior analysts and customers. EDR, incident response."
+            ),
+
+            # Deloitte: security operations + IDPS + automation. Early-career
+            # experience requirement is compatible with this profile.
+            "deloitte_idps": self.job(
+                "IDPS Cyber Automation Analyst",
+                "Toronto, ON - Remote",
+                "1-2 years experience in security operations. Support intrusion detection and prevention operations, "
+                "alert triage, incident investigation and response, Splunk, Python, API integrations, security automation, "
+                "SOC processes and firewall technologies."
+            ),
+
+            # ProServeIT: junior managed-security role, Canada remote.
+            "proserveit": self.job(
+                "Junior Security Analyst",
+                "Canada - Remote",
+                "Managed security for customers with security monitoring, event investigation and analysis, ticket lifecycle, "
+                "escalation and closure. Linux, Windows, SIEM, VPN, IDS/IPS and firewall knowledge. 2+ years SOC experience."
+            ),
+
+            # Home Hardware: operational cyber analyst in St. Jacobs.
+            "home_hardware": self.job(
+                "Cyber Security Analyst",
+                "St. Jacobs, ON",
+                "Monitor security alerts, investigate incidents, support vulnerability assessment and remediation, incident "
+                "response and escalation. Windows, Linux, XDR, SIEM and networking. Onsite once per month. 2 years experience."
+            ),
+
+            # Paladin: title looks perfect but this is physical-security operations,
+            # not cyber/SOC. This should never appear as a cyber recommendation.
+            "paladin_physical": self.job(
+                "Security Operations Analyst",
+                "Toronto, ON",
+                "Physical Security Operations across commercial real estate assets. Analyze guard and incident data, physical "
+                "security technology, front-line readiness, site security teams, access control, SOPs and operational reporting."
+            ),
+
+            # Sunnybrook: clearly senior and architecture/risk-oriented.
+            "sunnybrook_senior": self.job(
+                "Senior Security Analyst - Cyber Security",
+                "Toronto, ON",
+                "Senior cybersecurity role responsible for IT risk assessments, security architecture frameworks, cloud and "
+                "application security requirements and enterprise security design."
+            ),
+
+            # The HLB/Dice: aggregator says "Remote" and the title looks plausible,
+            # but the description requires an existing CDC badge and Atlanta-metro
+            # presence. Hard eligibility must outrank skill overlap.
+            "hlb_cdc": {
+                "title": "Security Analyst",
+                "location": "Remote",
+                "employment_type": "Contract W2",
+                "text": "MUST BE CDC BADGED and ATL METRO BASED. 5+ years cybersecurity operations. "
+                        "Security monitoring, incident response, vulnerability management, NIST SP 800-53, STIG and POA&M.",
+                "posted": RECENT_POSTED,
+                "url": "https://www.dice.com/job-detail/0b03b580-7701-4444-a96f-5383555707bd",
+            },
+
+            # CrowdStrike-style province constrained remote role. A Toronto-based
+            # profile should not see AB/BC-only remote as eligible.
+            "crowdstrike_bc": self.job(
+                "Analyst I, Falcon Complete (Remote, PST/MST)",
+                "Canada - Remote AB; Canada - Remote BC",
+                "Virtual SOC detecting and responding to incidents. EDR, malware analysis, forensic analysis, Windows and Linux."
+            ),
+        }
+
+        results = {name: evaluate(job, CYBERSECURITY_BETA_PROFILE) for name, job in cases.items()}
+
+        self.assertIn(results["cdw_l2"]["recommendation"], {"strong_apply", "apply", "maybe"})
+        self.assertIn(results["deloitte_idps"]["recommendation"], {"strong_apply", "apply", "maybe"})
+        self.assertIn(results["proserveit"]["recommendation"], {"strong_apply", "apply"})
+        self.assertIn(results["home_hardware"]["recommendation"], {"apply", "maybe"})
+
+        self.assertEqual(results["hlb_cdc"]["recommendation"], "skip")
+        self.assertEqual(results["hlb_cdc"]["eligibility_status"], "fail")
+        self.assertIn("requires_cdc_badge", results["hlb_cdc"]["warnings"])
+        self.assertIn("requires_atlanta_metro", results["hlb_cdc"]["warnings"])
+        self.assertIn("us_w2_only", results["hlb_cdc"]["warnings"])
+
+        self.assertEqual(results["paladin_physical"]["recommendation"], "skip")
+        self.assertEqual(results["sunnybrook_senior"]["recommendation"], "skip")
+        self.assertEqual(results["crowdstrike_bc"]["recommendation"], "skip")
+
+
+if __name__ == "__main__":
+    unittest.main()

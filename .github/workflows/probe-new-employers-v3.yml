@@ -1,0 +1,50 @@
+name: V3 prospective employers
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3-profile-matching]
+    paths: ['.github/workflows/probe-new-employers-v3.yml']
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify new employer feeds
+        run: |
+          python - <<'PY'
+          import json
+          from engine import fetch_greenhouse, fetch_ashby, fetch_lever
+          from match_v3 import evaluate
+          from profiles_v3 import CYBERSECURITY_BETA_PROFILE
+          for name, fetch, slug in [
+              ("Rush Street Interactive", fetch_greenhouse, "rushstreetinteractive"),
+              ("Fortra", fetch_greenhouse, "fortra"),
+              ("Horizon3.ai", fetch_ashby, "horizon3ai"),
+              ("Long View Systems", fetch_lever, "lvs1"),
+              ("Georgian", fetch_ashby, "georgian"),
+          ]:
+              try:
+                  jobs = fetch(slug)
+                  matches = []
+                  for job in jobs:
+                      if any(word in job["title"].lower() for word in (
+                          "soc", "security", "cyber", "threat", "incident"
+                      )):
+                          result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+                          matches.append({
+                              "title": job["title"], "location": job["location"],
+                              "url": job["url"], "recommendation": result["recommendation"],
+                              "score": result["overall_score"], "reason": result["reason"],
+                              "warnings": result.get("warnings", []),
+                          })
+                  print(json.dumps({"employer": name, "count": len(jobs),
+                                    "cyber_roles": matches[:20]}))
+              except Exception as exc:
+                  print(json.dumps({"employer": name, "error": str(exc)[:200]}))
+          PY

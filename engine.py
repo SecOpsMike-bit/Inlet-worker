@@ -15,6 +15,12 @@ import re
 import urllib.request
 import urllib.error
 
+from successfactors_feed import fetch_successfactors
+from dayforce_feed import fetch_dayforce
+from shopify_feed import fetch_shopify
+from jibe_feed import fetch_jibe_kinaxis
+from adp_feed import fetch_adp
+
 # ============================================================ FIELDS
 
 FIELD_PROFILES = {
@@ -214,10 +220,15 @@ def discover(slug):
             continue
     return None, []
 
-# search terms so a Workday board returns roles across all fields, not just security
-WORKDAY_TERMS = ["security", "software engineer", "developer", "data", "analyst",
-                 "product manager", "project manager", "finance", "accounting",
-                 "marketing", "sales", "operations"]
+# Prioritize specific SOC/MDR queries before broad keywords. Workday commonly
+# limits search results to the first page; broad "security" alone can miss
+# relevant junior analyst positions buried under unrelated listings.
+WORKDAY_TERMS = [
+    "soc analyst", "security operations", "incident response", "cybersecurity",
+    "threat analyst", "managed detection", "mdr", "security analyst", "security",
+    "software engineer", "developer", "data", "analyst", "product manager",
+    "project manager", "finance", "accounting", "marketing", "sales", "operations",
+]
 
 def fetch_workday(tenant, pod, site, per_term=20, cap=120, known=None):
     base = f"https://{tenant}.{pod}.myworkdayjobs.com"
@@ -287,6 +298,16 @@ def pull_company(company, known=None):
             w = company["workday"]
             return [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], known=known) if j]
         platform = company.get("platform")
+        if platform == "jibe":
+            return [j for j in fetch_jibe_kinaxis() if j]
+        if platform == "adp":
+            return [j for j in fetch_adp(company.get("board_url")) if j]
+        if platform == "shopify":
+            return [j for j in fetch_shopify() if j]
+        if platform == "dayforce":
+            return [j for j in fetch_dayforce(company.get("slug")) if j]
+        if platform == "successfactors":
+            return [j for j in fetch_successfactors(company.get("board_url")) if j]
         if platform == "smartrecruiters":
             return [j for j in fetch_smartrecruiters(company["slug"], known=known) if j]
         if platform in _FETCHERS:                     # greenhouse/lever/ashby: list already has text
@@ -295,6 +316,145 @@ def pull_company(company, known=None):
         return jobs
     except Exception:
         return []
+
+
+def pull_company_diagnostic(company, workday_cap=120):
+    """Fetch a company once and report whether a zero result is trustworthy.
+
+    Returns (jobs, diagnostic). A zero-job result from an unsupported provider,
+    failed HTTP request or unsuccessful auto-discovery must NEVER be interpreted
+    as proof the employer has no open positions.
+    """
+    name = company.get("name", "Unknown")
+    platform = company.get("platform", "auto")
+    if "workday" in company:
+        platform = "workday"
+    diagnostic = {"company": name, "platform": platform, "status": "unknown",
+                  "attempts": []}
+
+    if platform == "jibe":
+        try:
+            jobs = fetch_jibe_kinaxis()
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
+
+    if platform == "adp":
+        if not company.get("board_url"):
+            diagnostic["status"] = "missing_board_url"
+            return [], diagnostic
+        try:
+            jobs = fetch_adp(company["board_url"])
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
+
+    if platform == "shopify":
+        try:
+            jobs = fetch_shopify()
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
+
+    if platform == "dayforce":
+        if not company.get("slug"):
+            diagnostic["status"] = "missing_slug"
+            return [], diagnostic
+        try:
+            jobs = fetch_dayforce(company["slug"])
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except urllib.error.HTTPError as exc:
+            diagnostic["status"] = (
+                "access_blocked" if exc.code in (401, 403) else "fetch_error"
+            )
+            diagnostic["error"] = type(exc).__name__
+            diagnostic["http_status"] = exc.code
+            return [], diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            return [], diagnostic
+
+    if platform == "successfactors":
+        if not company.get("board_url"):
+            diagnostic["status"] = "missing_board_url"
+            return [], diagnostic
+        try:
+            jobs = fetch_successfactors(company.get("board_url"))
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
+
+    if "workday" in company:
+        w = company["workday"]
+        try:
+            jobs = [j for j in fetch_workday(w["tenant"], w["pod"], w["site"], cap=workday_cap) if j]
+            # Workday's existing fetcher handles request errors internally.
+            # Zero results could therefore mean either an empty feed or an error.
+            diagnostic["status"] = "ok" if jobs else "empty_or_feed_error"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            return [], diagnostic
+
+    slug = company.get("slug", "")
+    if platform in _FETCHERS or platform == "smartrecruiters":
+        fetch = fetch_smartrecruiters if platform == "smartrecruiters" else _FETCHERS[platform]
+        try:
+            jobs = [j for j in fetch(slug) if j]
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
+
+    if not slug:
+        diagnostic["status"] = "missing_slug"
+        return [], diagnostic
+
+    for provider, fetch in _AUTO:
+        try:
+            jobs = [j for j in fetch(slug) if j]
+            diagnostic["attempts"].append({"platform": provider,
+                                            "status": "ok" if jobs else "empty_feed"})
+            if jobs:
+                diagnostic["platform"] = provider
+                diagnostic["status"] = "ok"
+                return jobs, diagnostic
+        except Exception as exc:
+            attempt = {"platform": provider, "status": "fetch_error",
+                       "error": type(exc).__name__}
+            if isinstance(exc, urllib.error.HTTPError):
+                attempt["http_status"] = exc.code
+            diagnostic["attempts"].append(attempt)
+    diagnostic["status"] = "unresolved_feed"
+    return [], diagnostic
+
 
 # ============================================================ CLASSIFY + SCORE
 

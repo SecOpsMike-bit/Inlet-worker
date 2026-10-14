@@ -1,0 +1,136 @@
+name: V3 final employer ATS source audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3-profile-matching]
+    paths:
+      - '.github/workflows/probe-final-feeds-v3.yml'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Inspect official GoSecure ADP and Field Effect career source
+        run: |
+          python - <<'PY'
+          import html
+          import json
+          import re
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from html.parser import HTMLParser
+
+          class Links(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.a = []
+                  self.script = []
+                  self.iframe = []
+                  self.forms = []
+                  self.div_ids = []
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if tag == "a" and attrs.get("href"):
+                      self.a.append(attrs["href"])
+                  if tag == "script" and attrs.get("src"):
+                      self.script.append(attrs["src"])
+                  if tag == "iframe":
+                      self.iframe.append(attrs.get("src", ""))
+                  if tag == "form":
+                      self.forms.append(attrs.get("action", ""))
+                  if tag in {"div", "section"}:
+                      value = " ".join([attrs.get("id", ""), attrs.get("class", "")])
+                      if re.search(r"career|jobs|position|recruit|opening|applicant|talent", value, re.I):
+                          self.div_ids.append(value[:120])
+
+          CID = "5d5085c5-5799-40cd-ae96-c7e0621cd1bc"
+          base = "https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/job-requisitions"
+          targets = {
+              "GoSecure ADP external list": base + "?" + urllib.parse.urlencode({
+                  "cid": CID, "ccId": "19000101_000001", "$skip": 1, "$top": 20,
+              }),
+              "GoSecure ADP default list": base + "?" + urllib.parse.urlencode({
+                  "cid": CID, "$skip": 1, "$top": 20,
+              }),
+              "Field Effect official JobFeeds": "https://www.dayforcehcm.com/api/fieldeffect/V1/JobFeeds",
+              "Field Effect careers": "https://fieldeffect.com/careers",
+              "GoSecure employer careers": "https://legacy.gosecure.ai/careers/",
+          }
+          for name, url in targets.items():
+              result = {"source": name}
+              try:
+                  req = urllib.request.Request(url, headers={
+                      "User-Agent": "Mozilla/5.0 (compatible; GetInletsV3Audit/1.0)",
+                      "Accept": "application/json,text/html;q=0.9,*/*;q=0.8",
+                  })
+                  with urllib.request.urlopen(req, timeout=15) as resp:
+                      data = resp.read(700000).decode("utf-8", "replace")
+                      result["http"] = resp.status
+                      result["final_url"] = resp.url
+                  if data.lstrip().startswith(("{", "[")):
+                      j = json.loads(data)
+                      result["keys"] = list(j)[:30] if isinstance(j, dict) else []
+                      result["total"] = (j.get("meta") or {}).get("totalNumber") if isinstance(j, dict) else None
+                      if isinstance(j, list):
+                          result["jobs"] = len(j)
+                          result["samples"] = [
+                              {"title": x.get("Title"), "city": x.get("City"),
+                               "country": x.get("Country"),
+                               "url": x.get("JobDetailsUrl"),
+                               "posted": x.get("DatePosted")}
+                              for x in j[:6] if isinstance(x, dict)
+                          ]
+                          print(json.dumps(result, ensure_ascii=True))
+                          continue
+                      jobs = j.get("jobRequisitions", []) if isinstance(j, dict) else []
+                      result["jobs"] = len(jobs) if isinstance(jobs, list) else None
+                      result["samples"] = [{
+                          "title": x.get("requisitionTitle"),
+                          "id": x.get("itemID"),
+                          "locations": [
+                              (p.get("nameCode") or {}).get("shortName")
+                              for p in x.get("requisitionLocations", [])
+                          ],
+                          "custom_fields": [
+                              {"name": (v.get("nameCode") or {}).get("codeValue"),
+                               "value": str(v.get("stringValue", ""))[:70]}
+                              for v in (x.get("customFieldGroup") or {}).get("stringFields", [])
+                              if (v.get("nameCode") or {}).get("codeValue") == "ExternalJobID"
+                          ],
+                      } for x in jobs[:4]] if isinstance(jobs, list) else []
+                  else:
+                      parser = Links()
+                      parser.feed(data)
+                      result["links"] = list(dict.fromkeys(parser.a))[:50]
+                      result["script_sources"] = list(dict.fromkeys(parser.script))[:25]
+                      result["iframes"] = parser.iframe[:10]
+                      result["forms"] = parser.forms[:10]
+                      result["career_containers"] = list(dict.fromkeys(parser.div_ids))[:20]
+                      result["external_links"] = [
+                          link for link in dict.fromkeys(parser.a)
+                          if link.startswith("http") and not re.search(
+                              r"(fieldeffect\.com|gosecure\.ai|facebook|linkedin|youtube|twitter|instagram)",
+                              link, re.I
+                          )
+                      ][:25]
+                      result["job_context"] = [
+                          re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ",
+                              data[max(0, m.start()-150):m.start()+250])))[:350]
+                          for m in list(re.finditer(
+                              r"open positions|current openings|job openings|job postings|view jobs|apply now|no positions|no openings|career opportunities|workable|bamboohr|recruitee|jobvite|lever|greenhouse|ashby|adp|icims",
+                              data, re.I
+                          ))[:12]
+                      ]
+              except Exception as exc:
+                  result["error"] = type(exc).__name__
+                  if isinstance(exc, urllib.error.HTTPError):
+                      result["http"] = exc.code
+              print(json.dumps(result, ensure_ascii=True))
+          PY

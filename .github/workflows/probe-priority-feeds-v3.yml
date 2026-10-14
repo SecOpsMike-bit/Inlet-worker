@@ -1,0 +1,99 @@
+name: V3 priority employer feed smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3-profile-matching]
+    paths:
+      - '.github/workflows/probe-priority-feeds-v3.yml'
+      - 'dayforce_feed.py'
+      - 'shopify_feed.py'
+      - 'jibe_feed.py'
+      - 'adp_feed.py'
+      - 'engine.py'
+      - 'directory.py'
+
+concurrency:
+  group: v3-priority-feeds-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify official employer feeds and V3 decisions
+        run: |
+          python - <<'PY'
+          import json
+          from directory import DIRECTORY
+          from engine import pull_company_diagnostic
+          from match_v3 import evaluate
+          from profiles_v3 import CYBERSECURITY_BETA_PROFILE
+
+          for name in ("eSentire", "TELUS Digital Solutions", "Shopify", "Kinaxis", "Field Effect", "GoSecure", "Rush Street Interactive"):
+              employer = next(c for c in DIRECTORY if c["name"] == name)
+              jobs, diagnostic = pull_company_diagnostic(employer)
+              if diagnostic["status"] != "ok":
+                  raise RuntimeError(
+                      f"{name} feed is not healthy: {diagnostic}"
+                  )
+              assert jobs, f"{name} returned no public job postings"
+              assert all(
+                  j.get("title") and j.get("url", "").startswith("https://")
+                  for j in jobs
+              ), f"{name} returned malformed public job links"
+              recommendations = []
+              cyber_audit = []
+              for job in jobs:
+                  result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+                  if name in ("Field Effect", "GoSecure") and any(
+                      word in job["title"].lower() for word in ("security", "cyber", "soc", "incident")
+                  ):
+                      cyber_audit.append({
+                          "title": job["title"], "location": job["location"],
+                          "url": job["url"], "reason": result.get("reason"),
+                          "recommendation": result["recommendation"],
+                          "score": result["overall_score"],
+                          "explanation": result.get("explanation", {}),
+                          "description_excerpt": (job.get("text") or "")[:450],
+                      })
+                  if result["recommendation"] != "skip":
+                      recommendations.append({
+                          "title": job["title"], "location": job["location"],
+                          "score": result["overall_score"],
+                          "recommendation": result["recommendation"],
+                          "url": job["url"],
+                          "warnings": result.get("warnings", []),
+                      })
+              canadian = sum(
+                  any(t in (j.get("location") or "").lower() for t in (
+                      "canada", "ontario", "toronto", "waterloo",
+                      "vancouver", "ottawa", "montreal", "calgary"
+                  )) for j in jobs
+              )
+              if name == "Rush Street Interactive":
+                  canada_soc = [
+                      j for j in jobs
+                      if j.get("title") == "SOC Analyst"
+                      and (j.get("location") or "").strip() == "Canada"
+                  ]
+                  assert canada_soc, "Verified Canada SOC Analyst is missing"
+                  decision = evaluate(canada_soc[0], CYBERSECURITY_BETA_PROFILE)
+                  assert decision["recommendation"] != "skip", (
+                      "Verified Canada SOC role was incorrectly filtered: " + str(decision)
+                  )
+              print(json.dumps({
+                  "employer": name, "platform": diagnostic["platform"],
+                  "status": diagnostic["status"],
+                  "unique_postings": len(jobs),
+                  "canadian_location_postings": canadian,
+                  "v3_cyber_matches": len(recommendations),
+                  "v3_recommendations": recommendations[:20],
+                "cyber_audit": cyber_audit[:10],
+              }, indent=2))
+          PY
