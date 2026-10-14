@@ -16,12 +16,18 @@ from workday_v3 import fetch_workday_strict
 from collector_v3 import collect_batch, save_staging_json
 from directory import DIRECTORY
 
+# Verified employer-hosted ATS boards. Keep overrides isolated from production.
+VERIFIED_PLATFORMS = {"cyderes": ("lever", "cyderes")}
+
 
 def companies_from_directory():
     result = []
     for c in DIRECTORY:
         item = dict(c)
         item["platform"] = "workday" if "workday" in item else item.get("platform", "auto")
+        verified = VERIFIED_PLATFORMS.get(str(item.get("name", "")).casefold())
+        if verified:
+            item["platform"], item["slug"] = verified
         result.append(item)
     return result
 
