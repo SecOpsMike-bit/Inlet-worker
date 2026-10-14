@@ -135,6 +135,8 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
             "Remote - US",
             "India - Remote",
             "Remote, Denmark",
+            "USA - On Site",
+            "United Kingdom - On Site",
         ]
         for location in foreign_locations:
             with self.subTest(location=location):
@@ -236,6 +238,32 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
         self.assertEqual(result["recommendation"], "skip", result)
         self.assertEqual(result["reason"], "multi_location_unverified", result)
         self.assertEqual(result["eligibility_status"], "fail", result)
+
+    def test_rush_street_canada_soc_analyst_location(self):
+        """Verified Canada-wide Greenhouse posting is not a location false negative."""
+        job = self.job(
+            "SOC Analyst", "Canada",
+            "Monitor SIEM security events and alerts, investigate anomalies, "
+            "respond to security incidents using incident response playbooks, "
+            "maintain security monitoring and detection rules, EDR and XDR, "
+            "vulnerability scanners, Windows and Linux, network firewalls and VPN. "
+            "2+ years of cybersecurity experience. #LI-REMOTE",
+            posted=RECENT_POSTED,
+        )
+        job["url"] = (
+            "https://job-boards.greenhouse.io/rushstreetinteractive/jobs/6188413004"
+        )
+        result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+        self.assertIn(result["recommendation"], {"apply", "maybe", "strong_apply"}, result)
+        self.assertEqual(result["location_score"], 95)
+        self.assertNotEqual(result["eligibility_status"], "fail")
+
+        # A country-only location without a remote-work declaration remains
+        # potentially eligible but must carry a work-arrangement warning.
+        unspecified = dict(job, text=job["text"].replace("#LI-REMOTE", ""))
+        uncertain = evaluate(unspecified, CYBERSECURITY_BETA_PROFILE)
+        self.assertEqual(uncertain["location_score"], 68)
+        self.assertIn("canada_work_arrangement_unverified", uncertain["warnings"])
 
     def test_october_2026_field_effect_and_gosecure_live_feeds(self):
         """Employer-hosted ATS jobs must still obey location and seniority rules."""
