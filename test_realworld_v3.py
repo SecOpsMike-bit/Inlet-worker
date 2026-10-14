@@ -237,6 +237,37 @@ class V3RealWorldBenchmarkTests(unittest.TestCase):
         self.assertEqual(result["reason"], "multi_location_unverified", result)
         self.assertEqual(result["eligibility_status"], "fail", result)
 
+    def test_october_2026_field_effect_and_gosecure_live_feeds(self):
+        """Employer-hosted ATS jobs must still obey location and seniority rules."""
+        field_effect = self.job(
+            "Cyber Security Analyst", "BC, Canada",
+            "Field Effect Analytic Operations team in Western Canada (remote position). "
+            "Investigate MDR platform security alerts, analyze sensor telemetry, "
+            "SIEM, EDR, threat detection and incident response for customers.",
+            posted="2026-09-29",
+        )
+        field_effect["url"] = (
+            "https://jobs.dayforcehcm.com/en-US/fieldeffect/"
+            "CANDIDATEPORTAL/jobs/702"
+        )
+        gosecure = self.job(
+            "SOC Director", "Montréal, QC, CA / Toronto, ON, CA / Ottawa, CA",
+            "Lead the managed detection and response security operations center. "
+            "Oversee SOC analysts, threat hunting, SIEM, incident response.",
+            posted=RECENT_POSTED,
+        )
+        gosecure["url"] = (
+            "https://workforcenow.adp.com/mascsr/default/mdf/"
+            "recruitment/recruitment.html?jobId=584190"
+        )
+        bc = evaluate(field_effect, CYBERSECURITY_BETA_PROFILE)
+        senior = evaluate(gosecure, CYBERSECURITY_BETA_PROFILE)
+        self.assertEqual(bc["recommendation"], "skip")
+        self.assertEqual(bc["reason"], "outside_ontario")
+        self.assertEqual(bc["eligibility_status"], "fail")
+        self.assertEqual(senior["recommendation"], "skip")
+        self.assertEqual(senior["reason"], "excluded_title")
+
     def test_current_market_examples(self):
         cases = {
             # CDW Toronto: genuine SOC L2 work: SIEM/SOAR/tickets, triage,
