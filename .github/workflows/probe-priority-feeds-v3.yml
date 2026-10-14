@@ -48,8 +48,20 @@ jobs:
                   for j in jobs
               ), f"{name} returned malformed public job links"
               recommendations = []
+              cyber_audit = []
               for job in jobs:
                   result = evaluate(job, CYBERSECURITY_BETA_PROFILE)
+                  if name in ("Field Effect", "GoSecure") and any(
+                      word in job["title"].lower() for word in ("security", "cyber", "soc", "incident")
+                  ):
+                      cyber_audit.append({
+                          "title": job["title"], "location": job["location"],
+                          "url": job["url"], "reason": result.get("reason"),
+                          "recommendation": result["recommendation"],
+                          "score": result["overall_score"],
+                          "explanation": result.get("explanation", {}),
+                          "description_excerpt": (job.get("text") or "")[:450],
+                      })
                   if result["recommendation"] != "skip":
                       recommendations.append({
                           "title": job["title"], "location": job["location"],
@@ -71,5 +83,6 @@ jobs:
                   "canadian_location_postings": canadian,
                   "v3_cyber_matches": len(recommendations),
                   "v3_recommendations": recommendations[:20],
+                "cyber_audit": cyber_audit[:10],
               }, indent=2))
           PY
