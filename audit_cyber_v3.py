@@ -6,7 +6,21 @@ import re
 from collections import Counter
 from pathlib import Path
 
-CYBER_TERMS = re.compile(r"security|cyber|\bsoc\b|threat|incident|detection|\bdfir\b|\bmdr\b|\bsiem\b", re.I)
+CYBER_TERMS = re.compile(
+    r"cyber|information security|it security|security (?:operations|analyst|engineer|specialist|architect|incident|monitoring)"
+    r"|\\bsoc\\b|threat (?:analyst|detection|hunter|intelligence)|incident (?:response|responder)"
+    r"|detection (?:engineer|analyst)|\\bdfir\\b|\\bmdr\\b|\\bsiem\\b", re.I
+)
+NON_CYBER = re.compile(
+    r"financial security|security advisor|estate planning|physical security|security guard"
+    r"|loss prevention|social security", re.I
+)
+
+
+def is_cyber_title(title):
+    return bool(CYBER_TERMS.search(title or "")) and not bool(NON_CYBER.search(title or ""))
+
+
 CANADA_TERMS = re.compile(r"canada|ontario|toronto|mississauga|waterloo|kitchener|ottawa|vancouver|montreal|calgary|edmonton|\bON\b|\bBC\b|\bAB\b", re.I)
 REMOTE_TERMS = re.compile(r"remote", re.I)
 SENIOR_TERMS = re.compile(r"\bsenior\b|\bsr\.?\b|\blead\b|\bprincipal\b|\bstaff\b|\bdirector\b|\bmanager\b|\bhead\b|\bvp\b", re.I)
