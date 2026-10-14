@@ -1,6 +1,9 @@
 name: Inlet v3 staging feed audit
 
 on:
+  push:
+    branches:
+      - rebuild/collector-v3-staging
   workflow_dispatch:
 
 permissions:
