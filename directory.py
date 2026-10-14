@@ -13,7 +13,7 @@ DIRECTORY = [
 
     # Still to resolve (find each careers URL, then convert to a workday{} entry or correct slug):
     {"name": "eSentire",           "tier": 1, "slug": "esentire", "platform": "dayforce"},  # verified official public JobFeeds API
-    {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect"},
+    {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect", "platform": "dayforce"},  # verified official Dayforce JobFeeds, Canada analyst opening
     {"name": "GoSecure",           "tier": 1, "slug": "gosecure", "platform": "adp",
      "board_url": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=5d5085c5-5799-40cd-ae96-c7e0621cd1bc"},  # employer-linked ADP recruiting
 
