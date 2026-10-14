@@ -35,7 +35,7 @@ jobs:
           from match_v3 import evaluate
           from profiles_v3 import CYBERSECURITY_BETA_PROFILE
 
-          for name in ("eSentire", "TELUS Digital Solutions", "Shopify", "Kinaxis", "Field Effect", "GoSecure"):
+          for name in ("eSentire", "TELUS Digital Solutions", "Shopify", "Kinaxis", "Field Effect", "GoSecure", "Rush Street Interactive"):
               employer = next(c for c in DIRECTORY if c["name"] == name)
               jobs, diagnostic = pull_company_diagnostic(employer)
               if diagnostic["status"] != "ok":
@@ -76,6 +76,17 @@ jobs:
                       "vancouver", "ottawa", "montreal", "calgary"
                   )) for j in jobs
               )
+              if name == "Rush Street Interactive":
+                  canada_soc = [
+                      j for j in jobs
+                      if j.get("title") == "SOC Analyst"
+                      and (j.get("location") or "").strip() == "Canada"
+                  ]
+                  assert canada_soc, "Verified Canada SOC Analyst is missing"
+                  decision = evaluate(canada_soc[0], CYBERSECURITY_BETA_PROFILE)
+                  assert decision["recommendation"] != "skip", (
+                      "Verified Canada SOC role was incorrectly filtered: " + str(decision)
+                  )
               print(json.dumps({
                   "employer": name, "platform": diagnostic["platform"],
                   "status": diagnostic["status"],
