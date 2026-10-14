@@ -2,7 +2,7 @@
 
 **Branch:** `v3-profile-matching`, draft PR #3. **Production V2 unchanged.**
 
-## Current result: all 17 configured employers now have verified working feeds
+## 13 October baseline: all 17 original employers had verified working feeds
 
 The last completed full shadow before resolving the final two sources, [run 38486580376](https://github.com/SecOpsMike-bit/Inlet-worker/actions/runs/38486580376), evaluated **949 raw jobs from 15 working feeds**. It retained **two V3 `maybe` recommendations**, AlphaSense Security Operations Analyst II (Canada remote; 4 years) and Take-Two Security Operations Engineer (Toronto; 3 years). Do not claim a later full total until the 17-employer shadow finishes.
 
@@ -41,7 +41,7 @@ New `adp_feed.py` uses only the public external career centre, validates the emp
 
 ## Engineering and validation
 
-- `directory.py` now has **17/17 verified platform configurations**, with Field Effect as `dayforce` and GoSecure as `adp`.
+- At the 13 October baseline, `directory.py` had **17/17 verified platform configurations**, with Field Effect as `dayforce` and GoSecure as `adp`. The 14 October follow-up below expands this to 18 employers.
 - `engine.py` uses `fetch_adp` in both normal and diagnostic paths. Failed list requests are `fetch_error`, not `empty_feed`.
 - `test_adp_feed.py` covers tenant safety, public-only centre, one-based pagination, duplicate removal, detail failures and schema errors.
 - `test_feed_diagnostics.py` covers GoSecure and Field Effect wiring and HTTP error handling.
