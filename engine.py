@@ -19,6 +19,7 @@ from successfactors_feed import fetch_successfactors
 from dayforce_feed import fetch_dayforce
 from shopify_feed import fetch_shopify
 from jibe_feed import fetch_jibe_kinaxis
+from adp_feed import fetch_adp
 
 # ============================================================ FIELDS
 
@@ -300,7 +301,7 @@ def pull_company(company, known=None):
         if platform == "jibe":
             return [j for j in fetch_jibe_kinaxis() if j]
         if platform == "adp":
-            return []  # unsupported; never fall back to an unrelated slug
+            return [j for j in fetch_adp(company.get("board_url")) if j]
         if platform == "shopify":
             return [j for j in fetch_shopify() if j]
         if platform == "dayforce":
@@ -344,9 +345,19 @@ def pull_company_diagnostic(company, workday_cap=120):
             return [], diagnostic
 
     if platform == "adp":
-        diagnostic["status"] = "unsupported_platform"
-        diagnostic["board_url"] = company.get("board_url", "")
-        return [], diagnostic
+        if not company.get("board_url"):
+            diagnostic["status"] = "missing_board_url"
+            return [], diagnostic
+        try:
+            jobs = fetch_adp(company["board_url"])
+            diagnostic["status"] = "ok" if jobs else "empty_feed"
+            return jobs, diagnostic
+        except Exception as exc:
+            diagnostic["status"] = "fetch_error"
+            diagnostic["error"] = type(exc).__name__
+            if isinstance(exc, urllib.error.HTTPError):
+                diagnostic["http_status"] = exc.code
+            return [], diagnostic
 
     if platform == "shopify":
         try:
