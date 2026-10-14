@@ -19,13 +19,15 @@ jobs:
         run: |
           python - <<'PY'
           import json
-          from engine import fetch_greenhouse, fetch_ashby
+          from engine import fetch_greenhouse, fetch_ashby, fetch_lever
           from match_v3 import evaluate
           from profiles_v3 import CYBERSECURITY_BETA_PROFILE
           for name, fetch, slug in [
               ("Rush Street Interactive", fetch_greenhouse, "rushstreetinteractive"),
               ("Fortra", fetch_greenhouse, "fortra"),
               ("Horizon3.ai", fetch_ashby, "horizon3ai"),
+              ("Long View Systems", fetch_lever, "lvs1"),
+              ("Georgian", fetch_ashby, "georgian"),
           ]:
               try:
                   jobs = fetch(slug)
