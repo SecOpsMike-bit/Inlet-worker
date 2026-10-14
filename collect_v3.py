@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 import engine
+from workday_v3 import fetch_workday_strict
 from collector_v3 import collect_batch, save_staging_json
 from directory import DIRECTORY
 
@@ -33,7 +34,7 @@ def fetch_company(company):
     """
     if "workday" in company:
         w = company["workday"]
-        return [j for j in engine.fetch_workday(w["tenant"], w["pod"], w["site"]) if j]
+        return fetch_workday_strict(w["tenant"], w["pod"], w["site"])
     platform = company.get("platform")
     slug = company.get("slug")
     fetchers = {
@@ -70,7 +71,7 @@ def main(argv=None):
     result = collect_batch(selected, fetch_company)
     result["warning"] = (
         "Unresolved employer feed platforms are errors, not verified empty boards. "
-        "Workday's legacy per-search error suppression still requires hardening."
+        "Workday listing errors propagate; job-detail lookups remain best effort."
     )
     save_staging_json(result, args.output)
     print(json.dumps({"output": args.output, "stats": result["stats"],
