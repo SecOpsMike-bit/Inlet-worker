@@ -28,7 +28,7 @@ jobs:
       - name: Fetch employer jobs into local staging snapshot
         # Keep the audit read-only: no DATABASE_URL and no Supabase credentials.
         run: |
-          python collect_v3.py --company Cyderes --company 'Arctic Wolf' --company Optiv --company RBC --company 'TELUS International' --output staging/cyber-audit.json || true
+          python collect_v3.py --company Cyderes --company 'Arctic Wolf' --company Optiv --company RBC --company 'TELUS International' --output staging/cyber-audit.json || echo 'Collector reported one or more feed errors; validating snapshot below'
           python - <<'PY'
           import json
           from pathlib import Path
@@ -54,3 +54,19 @@ jobs:
             staging/cyber-summary.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Fail audit if any employer feed failed
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('staging/cyber-audit.json')
+          if not p.exists():
+              raise SystemExit('FAIL: collector produced no staging snapshot')
+          stats = json.loads(p.read_text())['stats']
+          if stats['companies_error']:
+              raise SystemExit(f"FAIL: {stats['companies_error']} employer feed(s) failed; staging is incomplete")
+          if stats['companies_attempted'] != 5:
+              raise SystemExit('FAIL: not all five configured employers were attempted')
+          print('PASS: all five employer feeds completed')
+          PY
