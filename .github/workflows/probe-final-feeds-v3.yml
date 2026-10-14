@@ -59,6 +59,7 @@ jobs:
               "GoSecure ADP default list": base + "?" + urllib.parse.urlencode({
                   "cid": CID, "$skip": 1, "$top": 20,
               }),
+              "Field Effect official JobFeeds": "https://www.dayforcehcm.com/api/fieldeffect/V1/JobFeeds",
               "Field Effect careers": "https://fieldeffect.com/careers",
               "GoSecure employer careers": "https://legacy.gosecure.ai/careers/",
           }
@@ -77,6 +78,17 @@ jobs:
                       j = json.loads(data)
                       result["keys"] = list(j)[:30] if isinstance(j, dict) else []
                       result["total"] = (j.get("meta") or {}).get("totalNumber") if isinstance(j, dict) else None
+                      if isinstance(j, list):
+                          result["jobs"] = len(j)
+                          result["samples"] = [
+                              {"title": x.get("Title"), "city": x.get("City"),
+                               "country": x.get("Country"),
+                               "url": x.get("JobDetailsUrl"),
+                               "posted": x.get("DatePosted")}
+                              for x in j[:6] if isinstance(x, dict)
+                          ]
+                          print(json.dumps(result, ensure_ascii=True))
+                          continue
                       jobs = j.get("jobRequisitions", []) if isinstance(j, dict) else []
                       result["jobs"] = len(jobs) if isinstance(jobs, list) else None
                       result["samples"] = [{
