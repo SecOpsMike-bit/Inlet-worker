@@ -5,6 +5,11 @@ import collect_v3
 
 
 class FetchAdapterTests(unittest.TestCase):
+    def test_cyderes_uses_verified_lever_feed(self):
+        company = next(c for c in collect_v3.companies_from_directory() if c["name"] == "Cyderes")
+        self.assertEqual(company["platform"], "lever")
+        self.assertEqual(company["slug"], "cyderes")
+
     def test_unresolved_platform_is_error(self):
         with self.assertRaisesRegex(ValueError, "Unresolved feed platform"):
             collect_v3.fetch_company({"name": "Unknown", "slug": "unknown", "platform": "auto"})
