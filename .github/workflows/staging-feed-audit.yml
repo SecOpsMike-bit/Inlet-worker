@@ -28,7 +28,7 @@ jobs:
       - name: Fetch employer jobs into local staging snapshot
         # Keep the audit read-only: no DATABASE_URL and no Supabase credentials.
         run: |
-          python collect_v3.py --company Cyderes --company Arctic Wolf --company Optiv --output staging/cyber-audit.json || true
+          python collect_v3.py --company Cyderes --company 'Arctic Wolf' --company Optiv --output staging/cyber-audit.json || true
           python - <<'PY'
           import json
           from pathlib import Path
