@@ -43,10 +43,14 @@ jobs:
           if stats['companies_error']:
               print('WARNING: Some employer feeds failed; counts are incomplete')
           PY
+      - name: Summarize Canadian cybersecurity candidates without discarding raw jobs
+        run: python audit_cyber_v3.py staging/cyber-audit.json --output staging/cyber-summary.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: inlet-v3-cyber-audit
-          path: staging/cyber-audit.json
+          path: |
+            staging/cyber-audit.json
+            staging/cyber-summary.json
           if-no-files-found: warn
           retention-days: 7
