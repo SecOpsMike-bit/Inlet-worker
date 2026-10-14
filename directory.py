@@ -22,6 +22,7 @@ DIRECTORY = [
     {"name": "Finastra",           "tier": 2, "workday": {"tenant": "finastra", "pod": "wd3", "site": "FINC"}},              # verified employer Workday
     {"name": "CDW",                "tier": 2, "workday": {"tenant": "cdw", "pod": "wd5", "site": "careers"}},                 # verified employer Workday
     {"name": "TELUS Digital Solutions", "tier": 2, "slug": "telus-digital", "platform": "ashby"},  # employer-linked Digital Solutions board
+    {"name": "Rush Street Interactive", "tier": 2, "slug": "rushstreetinteractive", "platform": "greenhouse"},  # verified live Canada SOC Analyst; Greenhouse employer board
 
     # Tier 3 - logistics / supply chain / retail (the ops-background edge)
     {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis", "platform": "jibe",
