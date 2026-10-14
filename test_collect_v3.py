@@ -21,7 +21,7 @@ class FetchAdapterTests(unittest.TestCase):
                 {"name": "Known", "slug": "known", "platform": "greenhouse"}), raw)
 
     def test_workday_fetch_uses_existing_tenant(self):
-        with patch.object(collect_v3.engine, "fetch_workday", return_value=[]) as fetch:
+        with patch.object(collect_v3, "fetch_workday_strict", return_value=[]) as fetch:
             collect_v3.fetch_company({"name": "Example", "platform": "workday",
                                       "workday": {"tenant": "abc", "pod": "wd1", "site": "External"}})
             fetch.assert_called_once_with("abc", "wd1", "External")
