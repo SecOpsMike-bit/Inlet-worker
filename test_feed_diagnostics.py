@@ -91,17 +91,45 @@ class FeedDiagnosticsTests(unittest.TestCase):
         )
         self.assertEqual(company["platform"], "dayforce")
 
-    def test_unsupported_employer_portals_are_not_empty_vacancies(self):
+    def test_gosecure_uses_verified_public_adp(self):
         from directory import DIRECTORY
-        for name, expected in (("GoSecure", "adp"),):
-            with self.subTest(employer=name):
-                company = next(c for c in DIRECTORY if c["name"] == name)
-                self.assertEqual(company["platform"], expected)
-                jobs, diagnostic = engine.pull_company_diagnostic(company)
-                self.assertEqual(jobs, [])
-                self.assertEqual(diagnostic["status"], "unsupported_platform")
-                self.assertEqual(diagnostic["platform"], expected)
-                self.assertTrue(diagnostic["board_url"].startswith("https://"))
+        company = next(c for c in DIRECTORY if c["name"] == "GoSecure")
+        self.assertEqual(company["platform"], "adp")
+        self.assertIn("workforcenow.adp.com", company["board_url"])
+        sample = [{"title": "SOC Director", "location": "Toronto, ON, CA",
+                   "url": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?jobId=584190",
+                   "posted": "2026-10-12", "text": "Manage the SOC"}]
+        with patch.object(engine, "fetch_adp", return_value=sample):
+            jobs, diag = engine.pull_company_diagnostic(company)
+        self.assertEqual(jobs, sample)
+        self.assertEqual(diag["status"], "ok")
+        self.assertEqual(diag["platform"], "adp")
+
+    def test_adp_fetch_error_is_not_zero_vacancies(self):
+        blocked = urllib.error.HTTPError(
+            "https://workforcenow.adp.com", 403, "Forbidden", {}, None
+        )
+        with patch.object(engine, "fetch_adp", side_effect=blocked):
+            jobs, diag = engine.pull_company_diagnostic({
+                "name": "GoSecure", "platform": "adp",
+                "board_url": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=5d5085c5-5799-40cd-ae96-c7e0621cd1bc",
+            })
+        self.assertEqual(jobs, [])
+        self.assertEqual(diag["status"], "fetch_error")
+        self.assertEqual(diag["http_status"], 403)
+
+    def test_field_effect_uses_verified_dayforce_jobfeeds(self):
+        from directory import DIRECTORY
+        company = next(c for c in DIRECTORY if c["name"] == "Field Effect")
+        self.assertEqual(company["platform"], "dayforce")
+        self.assertEqual(company["slug"], "fieldeffect")
+        sample = [{"title": "Cyber Security Analyst", "location": "Canada",
+                   "url": "https://jobs.dayforcehcm.com/en-US/fieldeffect/CANDIDATEPORTAL/jobs/702",
+                   "posted": "2026-09-29", "text": "Security monitoring"}]
+        with patch.object(engine, "fetch_dayforce", return_value=sample):
+            jobs, diag = engine.pull_company_diagnostic(company)
+        self.assertEqual(jobs, sample)
+        self.assertEqual(diag["status"], "ok")
 
     def test_kinaxis_uses_verified_public_jibe_api(self):
         from directory import DIRECTORY
