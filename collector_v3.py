@@ -85,8 +85,13 @@ def collect_batch(
             company_results.append({"company": name, "status": "ok" if jobs else "empty",
                                     "fetched": len(jobs), "valid": valid})
         except Exception as exc:
-            company_results.append({"company": name, "status": "error",
-                                    "error_type": type(exc).__name__, "fetched": 0, "valid": 0})
+            error = {"company": name, "status": "error",
+                     "error_type": type(exc).__name__, "fetched": 0, "valid": 0}
+            # Preserve actionable HTTP status without exposing response bodies or credentials.
+            status_code = getattr(exc, "code", None)
+            if isinstance(status_code, int):
+                error["http_status"] = status_code
+            company_results.append(error)
     return {
         "schema_version": 1,
         "postings": [asdict(x) for x in records.values()],
