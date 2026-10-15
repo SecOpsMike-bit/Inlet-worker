@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 import unittest
 
 import match_v2
@@ -8,7 +9,7 @@ class TakeTwoBenchmarkTest(unittest.TestCase):
         job = {
             "title": "Security Operations Engineer",
             "location": "Toronto, Ontario, Canada",
-            "posted": "2026-09-10",
+            "posted": (date.today() - timedelta(days=1)).isoformat(),
             "url": "https://example.com/taketwo",
             "text": (
                 "Support and maintain a Security Orchestration, Automation, and Response (SOAR) platform. "
