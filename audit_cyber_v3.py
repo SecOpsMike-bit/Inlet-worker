@@ -25,6 +25,7 @@ def is_cyber_title(title):
 
 CANADA_TERMS = re.compile(r"canada|ontario|toronto|mississauga|waterloo|kitchener|ottawa|vancouver|montreal|calgary|edmonton|\bON\b|\bBC\b|\bAB\b", re.I)
 REMOTE_TERMS = re.compile(r"remote", re.I)
+ADJACENT_CYBER_TERMS = re.compile(r"support center analyst|security support analyst|mdr support analyst", re.I)
 SENIOR_TERMS = re.compile(r"\bsenior\b|\bsr\.?\b|\blead\b|\bprincipal\b|\bstaff\b|\bdirector\b|\bmanager\b|\bhead\b|\bvp\b", re.I)
 
 
@@ -34,6 +35,9 @@ def summarize(postings):
     canada_explicit = [x for x in title_cyber if CANADA_TERMS.search(x.get("location", ""))]
     remote_unspecified = [x for x in title_cyber if REMOTE_TERMS.search(x.get("location", "")) and not CANADA_TERMS.search(x.get("location", ""))]
     review = [x for x in canada_explicit if not SENIOR_TERMS.search(x.get("title", ""))]
+    adjacent_review = [x for x in postings if ADJACENT_CYBER_TERMS.search(x.get("title", ""))
+                       and CANADA_TERMS.search(x.get("location", ""))
+                       and not SENIOR_TERMS.search(x.get("title", ""))]
     cyber_by_company = Counter(x.get("source_company", "") for x in title_cyber)
     canada_cyber_evidence = [
         {"company": x.get("source_company"), "title": x.get("title"),
@@ -62,6 +66,8 @@ def summarize(postings):
         "cyber_explicit_canada_location": len(canada_explicit),
         "cyber_remote_unspecified_country": len(remote_unspecified),
         "cyber_canada_non_senior_title_review": len(review),
+        "canadian_cyber_adjacent_support_review": [{"company": x.get("source_company"), "title": x.get("title"),
+                            "location": x.get("location"), "url": x.get("source_url")} for x in adjacent_review],
         "review_roles": [{"company": x.get("source_company"), "title": x.get("title"),
                           "location": x.get("location"), "url": x.get("source_url")} for x in review],
         "disclaimer": "Heuristic audit only; Canadian eligibility, current vacancy and entry-level requirements need human/source verification. Raw jobs are not removed.",
