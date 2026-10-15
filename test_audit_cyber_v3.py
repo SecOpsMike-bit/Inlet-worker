@@ -36,6 +36,7 @@ class CyberAuditTests(unittest.TestCase):
         jobs = [{"source_company": "RBC", "title": "Senior Cloud Security Engineer", "location": "Toronto, ON", "source_url": "https://example.com/rbc"}]
         report = summarize(jobs)
         self.assertEqual(report["cyber_canada_non_senior_title_review"], 0)
+        self.assertFalse(report["release_readiness"]["canadian_cyber_coverage_ready"])
         self.assertEqual(len(report["canada_cyber_evidence"]), 1)
         self.assertTrue(report["canada_cyber_evidence"][0]["senior_title_signal"])
 
