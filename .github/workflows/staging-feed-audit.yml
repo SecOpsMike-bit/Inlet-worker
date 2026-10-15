@@ -25,6 +25,8 @@ jobs:
           python-version: '3.12'
       - name: Run tests before collecting
         run: python -m unittest -v test_collector_v3.py test_collect_v3.py test_workday_v3.py test_audit_cyber_v3.py
+      - name: Diagnose TELUS Workday endpoint before long collection
+        run: python diagnose_telus_v3.py || echo 'TELUS diagnostic failed; full audit will record the feed failure'
       - name: Fetch employer jobs into local staging snapshot
         # Keep the audit read-only: no DATABASE_URL and no Supabase credentials.
         run: |
