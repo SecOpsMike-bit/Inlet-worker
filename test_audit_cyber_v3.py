@@ -23,6 +23,14 @@ class CyberAuditTests(unittest.TestCase):
         self.assertTrue(is_cyber_title("Application Security Specialist"))
         self.assertFalse(is_cyber_title("Financial Security Advisor"))
 
+    def test_cyber_breakdown_keeps_non_canadian_location_evidence(self):
+        from audit_cyber_v3 import summarize
+        jobs = [{"source_company": "Magnet Forensics", "title": "Vulnerability Researcher", "location": "United States", "source_url": "https://example.com/job"}]
+        report = summarize(jobs)
+        self.assertEqual(report["cyber_title_by_company"]["Magnet Forensics"], 1)
+        self.assertEqual(report["cyber_canada_non_senior_title_review"], 0)
+        self.assertEqual(report["cyber_outside_explicit_canada_examples"][0]["location"], "United States")
+
     def test_report_keeps_raw_job(self):
         posting = {"source_company": "RBC", "title": "Estate Planning Associate (Financial Security Advisor)",
                    "location": "Montréal, Quebec, Canada"}
