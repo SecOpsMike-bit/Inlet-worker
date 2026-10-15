@@ -91,6 +91,14 @@ def collect_batch(
             status_code = getattr(exc, "code", None)
             if isinstance(status_code, int):
                 error["http_status"] = status_code
+                if status_code in (401, 403):
+                    error["failure_category"] = "access_denied"
+                elif status_code in (404, 410):
+                    error["failure_category"] = "endpoint_not_found"
+                elif status_code == 429:
+                    error["failure_category"] = "rate_limited"
+                elif 500 <= status_code <= 599:
+                    error["failure_category"] = "upstream_failure"
             company_results.append(error)
     return {
         "schema_version": 1,
