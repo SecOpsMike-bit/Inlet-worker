@@ -7,6 +7,7 @@ DIRECTORY = [
     {"name": "Cyderes",            "tier": 1, "slug": "cyderes"},                 # confirmed: Lever
     {"name": "Arctic Wolf",        "tier": 1, "workday": {"tenant": "arcticwolf", "pod": "wd1", "site": "External"}},        # confirmed
     {"name": "Optiv",              "tier": 1, "workday": {"tenant": "optiv", "pod": "wd5", "site": "Optiv_Careers"}},        # confirmed
+    {"name": "Magnet Forensics", "tier": 1, "platform": "lever", "slug": "magnetforensics"},  # official Lever board verified
     # Still to resolve (find each careers URL, then convert to a workday{} entry or correct slug):
     {"name": "eSentire",           "tier": 1, "slug": "esentire"},
     {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect"},
