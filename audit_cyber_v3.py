@@ -34,8 +34,16 @@ def summarize(postings):
     canada_explicit = [x for x in title_cyber if CANADA_TERMS.search(x.get("location", ""))]
     remote_unspecified = [x for x in title_cyber if REMOTE_TERMS.search(x.get("location", "")) and not CANADA_TERMS.search(x.get("location", ""))]
     review = [x for x in canada_explicit if not SENIOR_TERMS.search(x.get("title", ""))]
+    cyber_by_company = Counter(x.get("source_company", "") for x in title_cyber)
+    cyber_location_examples = [
+        {"company": x.get("source_company"), "title": x.get("title"),
+         "location": x.get("location"), "url": x.get("source_url")}
+        for x in title_cyber if not CANADA_TERMS.search(x.get("location", ""))
+    ][:25]
     return {
         "raw_total": len(postings),
+        "cyber_title_by_company": dict(cyber_by_company),
+        "cyber_outside_explicit_canada_examples": cyber_location_examples,
         "by_company": dict(by_company),
         "cyber_title_signal": len(title_cyber),
         "cyber_explicit_canada_location": len(canada_explicit),
