@@ -14,7 +14,9 @@ DIRECTORY = [
 
     # Tier 2 - finance / fintech (high volume; Workday)
     {"name": "RBC",                "tier": 2, "workday": {"tenant": "rbc", "pod": "wd3", "site": "RBCGLOBAL1"}},          # confirmed
-    {"name": "TELUS International", "tier": 2, "workday": {"tenant": "telusinternational", "pod": "wd3", "site": "External"}},  # confirmed
+    {"name": "TELUS International", "tier": 2, "workday": {"tenant": "telusinternational", "pod": "wd3", "site": "External"},
+     "official_careers_url": "https://careers.telusdigital.com/search/jobs/in",
+     "feed_status": "blocked_http_403"},  # TELUS Digital rebrand; old Workday source is NOT confirmed
 
     # Tier 3 - logistics / supply chain / retail (the ops-background edge)
     {"name": "Kinaxis",            "tier": 3, "slug": "kinaxis"},
