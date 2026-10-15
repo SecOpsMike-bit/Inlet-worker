@@ -1,0 +1,91 @@
+"""Report candidate cyber inventory without filtering or modifying staged raw jobs."""
+from __future__ import annotations
+import argparse
+import json
+import re
+from collections import Counter
+from pathlib import Path
+
+CYBER_TERMS = re.compile(
+    r"cyber|information security|it security|security (?:operations|analyst|engineer|specialist|architect|incident|monitoring)"
+    r"|\bsoc\b|threat (?:analyst|detection|hunter|intelligence)|incident (?:response|responder)"
+    r"|detection (?:engineer|analyst)|\bdfir\b|\bmdr\b|\bsiem\b"
+    r"|vulnerability (?:researcher|analyst|engineer|management)"
+    r"|(?:cloud|application|appsec|product|endpoint|network) security", re.I
+)
+NON_CYBER = re.compile(
+    r"financial security|security advisor|estate planning|physical security|security guard"
+    r"|loss prevention|social security", re.I
+)
+
+
+def is_cyber_title(title):
+    return bool(CYBER_TERMS.search(title or "")) and not bool(NON_CYBER.search(title or ""))
+
+
+CANADA_TERMS = re.compile(r"canada|ontario|toronto|mississauga|waterloo|kitchener|ottawa|vancouver|montreal|calgary|edmonton|\bON\b|\bBC\b|\bAB\b", re.I)
+REMOTE_TERMS = re.compile(r"remote", re.I)
+ADJACENT_CYBER_TERMS = re.compile(r"support center analyst|security support analyst|mdr support analyst", re.I)
+SENIOR_TERMS = re.compile(r"\bsenior\b|\bsr\.?\b|\blead\b|\bprincipal\b|\bstaff\b|\bdirector\b|\bmanager\b|\bhead\b|\bvp\b", re.I)
+
+
+def summarize(postings):
+    by_company = Counter(x.get("source_company", "") for x in postings)
+    title_cyber = [x for x in postings if is_cyber_title(x.get("title", ""))]
+    canada_explicit = [x for x in title_cyber if CANADA_TERMS.search(x.get("location", ""))]
+    remote_unspecified = [x for x in title_cyber if REMOTE_TERMS.search(x.get("location", "")) and not CANADA_TERMS.search(x.get("location", ""))]
+    review = [x for x in canada_explicit if not SENIOR_TERMS.search(x.get("title", ""))]
+    adjacent_review = [x for x in postings if ADJACENT_CYBER_TERMS.search(x.get("title", ""))
+                       and CANADA_TERMS.search(x.get("location", ""))
+                       and not SENIOR_TERMS.search(x.get("title", ""))]
+    cyber_by_company = Counter(x.get("source_company", "") for x in title_cyber)
+    canada_cyber_evidence = [
+        {"company": x.get("source_company"), "title": x.get("title"),
+         "location": x.get("location"), "url": x.get("source_url"),
+         "senior_title_signal": bool(SENIOR_TERMS.search(x.get("title", "")))}
+        for x in canada_explicit
+    ]
+    cyber_location_examples = [
+        {"company": x.get("source_company"), "title": x.get("title"),
+         "location": x.get("location"), "url": x.get("source_url")}
+        for x in title_cyber if not CANADA_TERMS.search(x.get("location", ""))
+    ][:25]
+    release_readiness = {
+        "canadian_cyber_coverage_ready": bool(review),
+        "reason": "non_senior_canadian_cyber_titles_found" if review else "zero_non_senior_canadian_cyber_titles",
+        "note": "Heuristic inventory signal only; does not authorize deployment or verify eligibility.",
+    }
+    return {
+        "release_readiness": release_readiness,
+        "raw_total": len(postings),
+        "cyber_title_by_company": dict(cyber_by_company),
+        "canada_cyber_evidence": canada_cyber_evidence,
+        "cyber_outside_explicit_canada_examples": cyber_location_examples,
+        "by_company": dict(by_company),
+        "cyber_title_signal": len(title_cyber),
+        "cyber_explicit_canada_location": len(canada_explicit),
+        "cyber_remote_unspecified_country": len(remote_unspecified),
+        "cyber_canada_non_senior_title_review": len(review),
+        "canadian_cyber_adjacent_support_review": [{"company": x.get("source_company"), "title": x.get("title"),
+                            "location": x.get("location"), "url": x.get("source_url")} for x in adjacent_review],
+        "review_roles": [{"company": x.get("source_company"), "title": x.get("title"),
+                          "location": x.get("location"), "url": x.get("source_url")} for x in review],
+        "disclaimer": "Heuristic audit only; Canadian eligibility, current vacancy and entry-level requirements need human/source verification. Raw jobs are not removed.",
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("snapshot")
+    parser.add_argument("--output", default="staging/cyber-summary.json")
+    args = parser.parse_args()
+    data = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
+    summary = summarize(data["postings"])
+    target = Path(args.output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

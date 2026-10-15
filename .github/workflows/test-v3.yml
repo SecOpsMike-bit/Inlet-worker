@@ -1,0 +1,21 @@
+name: Test Inlet v3 collector
+
+on:
+  push:
+    branches:
+      - rebuild/collector-v3-staging
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile v3 files
+        run: python -m py_compile collector_v3.py collect_v3.py test_collector_v3.py test_collect_v3.py test_workday_v3.py workday_v3.py
+      - name: Run isolated regression tests
+        run: python -m unittest -v test_collector_v3.py test_collect_v3.py test_workday_v3.py

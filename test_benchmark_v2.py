@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 """Regression benchmarks based on roles manually reviewed during the job search.
 
 The point is not to reproduce every word of an employer posting. These fixtures keep
@@ -11,12 +12,12 @@ import match_v2
 
 
 class MichaelMatchBenchmarkTests(unittest.TestCase):
-    def job(self, title, location, text, posted="2026-09-09"):
+    def job(self, title, location, text, posted=None):
         return {
             "title": title,
             "location": location,
             "text": text,
-            "posted": posted,
+            "posted": posted or (date.today() - timedelta(days=1)).isoformat(),
             "url": "https://example.com/benchmark",
         }
 

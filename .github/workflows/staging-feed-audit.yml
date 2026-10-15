@@ -1,0 +1,104 @@
+name: Inlet v3 staging feed audit
+
+on:
+  push:
+    branches:
+      - rebuild/collector-v3-staging
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/collector-v3-staging
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run tests before collecting
+        run: python -m unittest -v test_collector_v3.py test_collect_v3.py test_workday_v3.py test_audit_cyber_v3.py test_telus_digital_v3.py
+      # TELUS Digital is explicitly excluded from the verified baseline: its public
+      # careers HTML and legacy Workday endpoint both return HTTP 403 in CI.
+      # It remains unresolved, not empty or successfully collected.
+      - name: Fetch five employer feeds including Magnet Forensics into local staging snapshot
+        # Keep the audit read-only: no DATABASE_URL and no Supabase credentials.
+        run: |
+          python collect_v3.py --company Cyderes --company 'Arctic Wolf' --company Optiv --company RBC --company 'Magnet Forensics' --output staging/cyber-audit.json || echo 'Collector reported one or more feed errors; validating snapshot below'
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('staging/cyber-audit.json')
+          if not p.exists():
+              raise SystemExit('Collector failed to produce an audit snapshot')
+          d = json.loads(p.read_text())
+          stats = d['stats']
+          print('STAGING AUDIT STATS:', json.dumps(stats, sort_keys=True))
+          for c in d['companies']:
+              print('EMPLOYER:', c['company'], c['status'], 'http_status=', c.get('http_status', 'n/a'), 'category=', c.get('failure_category', 'n/a'), 'fetched=', c['fetched'], 'valid=', c['valid'])
+          if stats['companies_error']:
+              print('WARNING: Some employer feeds failed; counts are incomplete')
+          PY
+      - name: Summarize Canadian cybersecurity candidates without discarding raw jobs
+        run: python audit_cyber_v3.py staging/cyber-audit.json --output staging/cyber-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inlet-v3-cyber-audit
+          path: |
+            staging/cyber-audit.json
+            staging/cyber-summary.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Fail audit if any employer feed failed
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('staging/cyber-audit.json')
+          if not p.exists():
+              raise SystemExit('FAIL: collector produced no staging snapshot')
+          stats = json.loads(p.read_text())['stats']
+          if stats['companies_error']:
+              raise SystemExit(f"FAIL: {stats['companies_error']} employer feed(s) failed; staging is incomplete")
+          if stats['companies_attempted'] != 5:
+              raise SystemExit('FAIL: not all five configured employers were attempted')
+          print('PASS: all five configured employer feeds completed')
+          PY
+
+  canadian_cyber_release_gate:
+    name: Canadian cybersecurity release gate
+    needs: audit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: inlet-v3-cyber-audit
+          path: staging
+      - name: Block release without Canadian non-senior cyber candidates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("staging/cyber-summary.json")
+          if not p.exists():
+              raise SystemExit("BLOCKED: cyber audit summary missing")
+          summary = json.loads(p.read_text(encoding="utf-8"))
+          readiness = summary.get("release_readiness", {})
+          if readiness.get("canadian_cyber_coverage_ready") is not True:
+              raise SystemExit("BLOCKED: no Canadian non-senior cybersecurity title candidates; do not deploy")
+          if not summary.get("review_roles"):
+              raise SystemExit("BLOCKED: missing supporting Canadian cybersecurity job evidence")
+          print("Candidate coverage signal passed; manual eligibility review and other release gates still required")
+          PY
