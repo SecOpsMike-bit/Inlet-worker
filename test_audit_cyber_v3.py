@@ -31,6 +31,14 @@ class CyberAuditTests(unittest.TestCase):
         self.assertEqual(report["cyber_canada_non_senior_title_review"], 0)
         self.assertEqual(report["cyber_outside_explicit_canada_examples"][0]["location"], "United States")
 
+    def test_canadian_senior_cyber_job_remains_visible_as_evidence(self):
+        from audit_cyber_v3 import summarize
+        jobs = [{"source_company": "RBC", "title": "Senior Cloud Security Engineer", "location": "Toronto, ON", "source_url": "https://example.com/rbc"}]
+        report = summarize(jobs)
+        self.assertEqual(report["cyber_canada_non_senior_title_review"], 0)
+        self.assertEqual(len(report["canada_cyber_evidence"]), 1)
+        self.assertTrue(report["canada_cyber_evidence"][0]["senior_title_signal"])
+
     def test_report_keeps_raw_job(self):
         posting = {"source_company": "RBC", "title": "Estate Planning Associate (Financial Security Advisor)",
                    "location": "Montréal, Quebec, Canada"}
