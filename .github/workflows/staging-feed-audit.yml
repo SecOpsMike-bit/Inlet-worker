@@ -25,12 +25,13 @@ jobs:
           python-version: '3.12'
       - name: Run tests before collecting
         run: python -m unittest -v test_collector_v3.py test_collect_v3.py test_workday_v3.py test_audit_cyber_v3.py test_telus_digital_v3.py
-      - name: Diagnose TELUS Workday endpoint before long collection
-        run: python diagnose_telus_v3.py || echo 'TELUS diagnostic failed; full audit will record the feed failure'
-      - name: Fetch employer jobs into local staging snapshot
+      # TELUS Digital is explicitly excluded from the verified baseline: its public
+      # careers HTML and legacy Workday endpoint both return HTTP 403 in CI.
+      # It remains unresolved, not empty or successfully collected.
+      - name: Fetch four verified employer feeds into local staging snapshot
         # Keep the audit read-only: no DATABASE_URL and no Supabase credentials.
         run: |
-          python collect_v3.py --company Cyderes --company 'Arctic Wolf' --company Optiv --company RBC --company 'TELUS International' --output staging/cyber-audit.json || echo 'Collector reported one or more feed errors; validating snapshot below'
+          python collect_v3.py --company Cyderes --company 'Arctic Wolf' --company Optiv --company RBC --output staging/cyber-audit.json || echo 'Collector reported one or more feed errors; validating snapshot below'
           python - <<'PY'
           import json
           from pathlib import Path
@@ -68,7 +69,7 @@ jobs:
           stats = json.loads(p.read_text())['stats']
           if stats['companies_error']:
               raise SystemExit(f"FAIL: {stats['companies_error']} employer feed(s) failed; staging is incomplete")
-          if stats['companies_attempted'] != 5:
-              raise SystemExit('FAIL: not all five configured employers were attempted')
-          print('PASS: all five employer feeds completed')
+          if stats['companies_attempted'] != 4:
+              raise SystemExit('FAIL: not all four verified employers were attempted')
+          print('PASS: all four verified employer feeds completed')
           PY
