@@ -37,6 +37,15 @@ class CollectorV3Tests(unittest.TestCase):
         self.assertEqual(result["stats"]["companies_error"], 1)
         self.assertEqual(result["stats"]["unique_postings"], 2)
 
+    def test_http_failure_records_status_without_exposing_url(self):
+        from urllib.error import HTTPError
+        def fail(_):
+            raise HTTPError("https://example.com/private?token=secret", 404, "Not Found", {}, None)
+        result = collect_batch(self.companies, fail)
+        error = result["companies"][0]
+        self.assertEqual(error["http_status"], 404)
+        self.assertNotIn("secret", str(error))
+
     def test_empty_is_not_error(self):
         result = collect_batch(self.companies, lambda _: [])
         self.assertEqual(result["stats"]["companies_empty"], 1)
