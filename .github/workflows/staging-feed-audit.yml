@@ -41,7 +41,7 @@ jobs:
           stats = d['stats']
           print('STAGING AUDIT STATS:', json.dumps(stats, sort_keys=True))
           for c in d['companies']:
-              print('EMPLOYER:', c['company'], c['status'], 'http_status=', c.get('http_status', 'n/a'), 'fetched=', c['fetched'], 'valid=', c['valid'])
+              print('EMPLOYER:', c['company'], c['status'], 'http_status=', c.get('http_status', 'n/a'), 'category=', c.get('failure_category', 'n/a'), 'fetched=', c['fetched'], 'valid=', c['valid'])
           if stats['companies_error']:
               print('WARNING: Some employer feeds failed; counts are incomplete')
           PY
