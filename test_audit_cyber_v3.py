@@ -40,6 +40,14 @@ class CyberAuditTests(unittest.TestCase):
         self.assertEqual(len(report["canada_cyber_evidence"]), 1)
         self.assertTrue(report["canada_cyber_evidence"][0]["senior_title_signal"])
 
+    def test_canadian_mdr_support_role_is_adjacent_not_soc_release_evidence(self):
+        from audit_cyber_v3 import summarize
+        jobs = [{"source_company": "eSentire", "title": "Support Center Analyst I", "location": "Waterloo, Ontario", "source_url": "https://example.com/support"}]
+        report = summarize(jobs)
+        self.assertEqual(len(report["canadian_cyber_adjacent_support_review"]), 1)
+        self.assertEqual(report["cyber_canada_non_senior_title_review"], 0)
+        self.assertFalse(report["release_readiness"]["canadian_cyber_coverage_ready"])
+
     def test_report_keeps_raw_job(self):
         posting = {"source_company": "RBC", "title": "Estate Planning Associate (Financial Security Advisor)",
                    "location": "Montréal, Quebec, Canada"}
