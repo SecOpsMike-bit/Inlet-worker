@@ -46,7 +46,13 @@ def summarize(postings):
          "location": x.get("location"), "url": x.get("source_url")}
         for x in title_cyber if not CANADA_TERMS.search(x.get("location", ""))
     ][:25]
+    release_readiness = {
+        "canadian_cyber_coverage_ready": bool(review),
+        "reason": "non_senior_canadian_cyber_titles_found" if review else "zero_non_senior_canadian_cyber_titles",
+        "note": "Heuristic inventory signal only; does not authorize deployment or verify eligibility.",
+    }
     return {
+        "release_readiness": release_readiness,
         "raw_total": len(postings),
         "cyber_title_by_company": dict(cyber_by_company),
         "canada_cyber_evidence": canada_cyber_evidence,
