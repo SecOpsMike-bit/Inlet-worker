@@ -28,3 +28,12 @@ Run tests locally: `python -m unittest -v test_collector_v3.py`.
 4. Failure and downtime recovery do not delete unvisited company records.
 5. Preview points to staging; owner reviews results.
 6. Production switch only after explicit approval and rollback plan.
+
+
+## TELUS Digital source verification (2026-10-14)
+
+- Legacy `TELUS International` Workday listing endpoint returned HTTP 403 in staging; **not a verified working feed**.
+- Official replacement careers listing: https://careers.telusdigital.com/search/jobs/in
+- Canada filter: https://careers.telusdigital.com/search/jobs/in/country/canada
+- Do not equate the accessible HTML careers page with a validated automated API or full job coverage. Preserve `companies_error` until a source adapter is implemented and tested against the official site.
+- Do not use login bypass, rate-limit evasion, or undocumented Workday endpoints. Keep the staging audit read-only; do not deploy.
