@@ -9,7 +9,7 @@ DIRECTORY = [
     {"name": "Optiv",              "tier": 1, "workday": {"tenant": "optiv", "pod": "wd5", "site": "Optiv_Careers"}},        # confirmed
     {"name": "Magnet Forensics", "tier": 1, "platform": "lever", "slug": "magnetforensics"},  # official Lever board verified
     # Still to resolve (find each careers URL, then convert to a workday{} entry or correct slug):
-    {"name": "eSentire",           "tier": 1, "slug": "esentire"},
+    {"name": "eSentire",           "tier": 1, "platform": "dayforce", "official_careers_url": "https://www.esentire.com/company/careers", "feed_status": "adapter_not_implemented"},  # official site links to Dayforce; do not assume Lever slug
     {"name": "Field Effect",       "tier": 1, "slug": "fieldeffect"},
     {"name": "GoSecure",           "tier": 1, "slug": "gosecure"},
 
