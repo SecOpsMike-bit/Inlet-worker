@@ -73,3 +73,32 @@ jobs:
               raise SystemExit('FAIL: not all five configured employers were attempted')
           print('PASS: all five configured employer feeds completed')
           PY
+
+  canadian_cyber_release_gate:
+    name: Canadian cybersecurity release gate
+    needs: audit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: inlet-v3-cyber-audit
+          path: staging
+      - name: Block release without Canadian non-senior cyber candidates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("staging/cyber-summary.json")
+          if not p.exists():
+              raise SystemExit("BLOCKED: cyber audit summary missing")
+          summary = json.loads(p.read_text(encoding="utf-8"))
+          readiness = summary.get("release_readiness", {})
+          if readiness.get("canadian_cyber_coverage_ready") is not True:
+              raise SystemExit("BLOCKED: no Canadian non-senior cybersecurity title candidates; do not deploy")
+          if not summary.get("review_roles"):
+              raise SystemExit("BLOCKED: missing supporting Canadian cybersecurity job evidence")
+          print("Candidate coverage signal passed; manual eligibility review and other release gates still required")
+          PY
