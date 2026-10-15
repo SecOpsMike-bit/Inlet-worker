@@ -37,3 +37,10 @@ Run tests locally: `python -m unittest -v test_collector_v3.py`.
 - Canada filter: https://careers.telusdigital.com/search/jobs/in/country/canada
 - Do not equate the accessible HTML careers page with a validated automated API or full job coverage. Preserve `companies_error` until a source adapter is implemented and tested against the official site.
 - Do not use login bypass, rate-limit evasion, or undocumented Workday endpoints. Keep the staging audit read-only; do not deploy.
+
+## Verified-feed baseline versus blocked employer (2026-10-15)
+
+- The TELUS Digital public Canada HTML page also returned HTTP 403 from GitHub Actions, despite fixture parser tests passing. **Do not claim the TELUS adapter works live.**
+- The staging audit now tests the four known-working employers (Cyderes, Arctic Wolf, Optiv, RBC) and fails if any of those feeds fails. TELUS is excluded from that verified-feed baseline, not recorded as an empty board.
+- TELUS remains an unresolved coverage gap and an explicit **production release blocker** until a compliant, reliably accessible source is validated with a live integration test.
+- Passing the four-feed staging baseline is **not** sufficient to merge or deploy. Canadian entry-level cybersecurity recall and legacy matcher issues also remain unresolved.
