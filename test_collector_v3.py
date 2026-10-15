@@ -46,6 +46,15 @@ class CollectorV3Tests(unittest.TestCase):
         self.assertEqual(error["http_status"], 404)
         self.assertNotIn("secret", str(error))
 
+    def test_403_is_access_denied_not_empty(self):
+        from urllib.error import HTTPError
+        def blocked(_):
+            raise HTTPError("https://example.com/jobs", 403, "Forbidden", {}, None)
+        result = collect_batch(self.companies, blocked)
+        self.assertEqual(result["companies"][0]["failure_category"], "access_denied")
+        self.assertEqual(result["stats"]["companies_error"], 1)
+        self.assertEqual(result["stats"]["companies_empty"], 0)
+
     def test_empty_is_not_error(self):
         result = collect_batch(self.companies, lambda _: [])
         self.assertEqual(result["stats"]["companies_empty"], 1)
