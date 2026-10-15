@@ -28,10 +28,10 @@ jobs:
       # TELUS Digital is explicitly excluded from the verified baseline: its public
       # careers HTML and legacy Workday endpoint both return HTTP 403 in CI.
       # It remains unresolved, not empty or successfully collected.
-      - name: Fetch four verified employer feeds into local staging snapshot
+      - name: Fetch five employer feeds including Magnet Forensics into local staging snapshot
         # Keep the audit read-only: no DATABASE_URL and no Supabase credentials.
         run: |
-          python collect_v3.py --company Cyderes --company 'Arctic Wolf' --company Optiv --company RBC --output staging/cyber-audit.json || echo 'Collector reported one or more feed errors; validating snapshot below'
+          python collect_v3.py --company Cyderes --company 'Arctic Wolf' --company Optiv --company RBC --company 'Magnet Forensics' --output staging/cyber-audit.json || echo 'Collector reported one or more feed errors; validating snapshot below'
           python - <<'PY'
           import json
           from pathlib import Path
@@ -69,7 +69,7 @@ jobs:
           stats = json.loads(p.read_text())['stats']
           if stats['companies_error']:
               raise SystemExit(f"FAIL: {stats['companies_error']} employer feed(s) failed; staging is incomplete")
-          if stats['companies_attempted'] != 4:
-              raise SystemExit('FAIL: not all four verified employers were attempted')
-          print('PASS: all four verified employer feeds completed')
+          if stats['companies_attempted'] != 5:
+              raise SystemExit('FAIL: not all five configured employers were attempted')
+          print('PASS: all five configured employer feeds completed')
           PY
