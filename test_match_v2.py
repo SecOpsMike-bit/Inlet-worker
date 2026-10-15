@@ -1,12 +1,13 @@
+from datetime import date, timedelta
 import unittest
 
 import match_v2
 
 
 class MatchV2Tests(unittest.TestCase):
-    def job(self, title, text, location="Toronto, ON", posted="2026-09-10"):
+    def job(self, title, text, location="Toronto, ON", posted=None):
         return {"title": title, "text": text, "location": location,
-                "posted": posted, "url": "https://example.com/job"}
+                "posted": posted or (date.today() - timedelta(days=1)).isoformat(), "url": "https://example.com/job"}
 
     def test_strong_soc_role_is_accepted(self):
         j = self.job(
