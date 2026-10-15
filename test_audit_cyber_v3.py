@@ -16,6 +16,13 @@ class CyberAuditTests(unittest.TestCase):
             with self.subTest(title=title):
                 self.assertTrue(is_cyber_title(title))
 
+    def test_vulnerability_research_and_cloud_security_are_cyber(self):
+        from audit_cyber_v3 import is_cyber_title
+        self.assertTrue(is_cyber_title("Vulnerability Researcher"))
+        self.assertTrue(is_cyber_title("Cloud Security Engineer"))
+        self.assertTrue(is_cyber_title("Application Security Specialist"))
+        self.assertFalse(is_cyber_title("Financial Security Advisor"))
+
     def test_report_keeps_raw_job(self):
         posting = {"source_company": "RBC", "title": "Estate Planning Associate (Financial Security Advisor)",
                    "location": "Montréal, Quebec, Canada"}
