@@ -13,6 +13,7 @@ from pathlib import Path
 
 import engine
 from workday_v3 import fetch_workday_strict
+from telus_digital_v3 import fetch_telus_digital_canada
 from collector_v3 import collect_batch, save_staging_json
 from directory import DIRECTORY
 
@@ -38,6 +39,8 @@ def fetch_company(company):
     Unknown-platform discovery is deliberately rejected until its source is
     resolved: engine.discover() swallows errors and would report false empties.
     """
+    if company.get("name") == "TELUS International":
+        return fetch_telus_digital_canada()
     if "workday" in company:
         w = company["workday"]
         return fetch_workday_strict(w["tenant"], w["pod"], w["site"])
